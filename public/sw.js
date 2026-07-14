@@ -87,7 +87,7 @@ self.addEventListener('message', (event) => {
       if (time24h > now) {
         scheduleItems.push({
           time: time24h,
-          body: `Tomorrow at ${formatTime(appt.time)} — ${appt.type === 'business' ? `Braiding/Nails for ${appt.clientName}` : appt.title} 🌸`
+          body: `Tomorrow at ${formatTime(appt.time)}: ${appt.type === 'business' ? `Braiding/Nails for ${appt.clientName}` : appt.title} 🌸`
         });
       }
     }
@@ -97,7 +97,7 @@ self.addEventListener('message', (event) => {
       if (time2h > now) {
         scheduleItems.push({
           time: time2h,
-          body: `In 2 hours — ${appt.type === 'business' ? `${appt.service === 'both' ? 'Hair & Nails' : appt.service} for ${appt.clientName}` : appt.title}. Get ready! 💅`
+          body: `In 2 hours: ${appt.type === 'business' ? `${appt.service === 'both' ? 'Hair & Nails' : appt.service} for ${appt.clientName}` : appt.title}. Get ready! 💅`
         });
       }
     }

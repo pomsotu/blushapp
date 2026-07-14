@@ -64,10 +64,9 @@ export default function CalendarGrid({ selectedDate, onSelectDay }) {
         </button>
       </div>
 
-      {/* Day of Week Headers */}
       <div className="grid grid-cols-7 gap-1 text-center mb-2">
         {DAYS.map((d) => (
-          <div key={d} className="font-sans text-[11px] font-extrabold text-pink-deep/40 uppercase tracking-wider">
+          <div key={d} className="font-sans text-[11px] font-extrabold text-pink-deep/65 uppercase tracking-wider">
             {d}
           </div>
         ))}
@@ -107,7 +106,7 @@ export default function CalendarGrid({ selectedDate, onSelectDay }) {
               <div
                 className={`w-9 h-9 rounded-full flex items-center justify-center font-sans text-[13px] font-bold transition-all ${
                   isSelected
-                    ? 'bg-gradient-to-br from-pink-primary to-pink-deep text-white shadow-md shadow-pink-primary/30Scale scale-105'
+                    ? 'bg-gradient-to-br from-pink-primary to-pink-deep text-white shadow-md shadow-pink-primary/35 scale-105'
                     : isCurrentToday
                     ? 'bg-pink-soft/70 text-pink-deep border-2 border-pink-primary/40'
                     : 'text-gray-700 hover:bg-pink-soft/30 hover:text-pink-deep'

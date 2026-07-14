@@ -24,7 +24,7 @@ export default function ConflictModal({ isOpen, onConfirm, onCancel }) {
           </h3>
           
           <p className="font-sans text-gray-500 text-sm leading-relaxed mb-6 font-semibold">
-            Heads up Tari — you already have another appointment scheduled during this time window. Still want to save this booking anyway?
+            Heads up Tari, you already have another appointment scheduled during this time window. Still want to save this booking anyway?
           </p>
           
           <div className="flex flex-col gap-2 w-full">
@@ -37,9 +37,9 @@ export default function ConflictModal({ isOpen, onConfirm, onCancel }) {
             
             <button
               onClick={onConfirm}
-              className="w-full py-3 rounded-2xl bg-gray-50 text-gray-400 hover:bg-gray-100 font-bold text-sm transition-all border border-gray-200/50"
+              className="w-full py-3 rounded-2xl bg-gray-50 text-gray-500 hover:bg-gray-100 hover:text-gray-700 font-bold text-sm transition-all border border-gray-200/50"
             >
-              Save Anyway ✨
+              Save Anyway 🌸
             </button>
           </div>
         </div>

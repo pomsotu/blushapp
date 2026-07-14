@@ -140,7 +140,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
         <h2 className="font-serif italic text-2xl font-black text-pink-deep mb-2">
           {isEditing ? 'Updated!' : 'Booked! 🌸'}
         </h2>
-        <p className="font-sans text-gray-400 font-bold text-sm text-center">
+        <p className="font-sans text-gray-500 font-extrabold text-sm text-center">
           Saved and reminders are set 💅
         </p>
       </div>
@@ -174,7 +174,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
               className={`flex-1 py-3 rounded-xl border-none font-sans text-xs font-black transition-all cursor-pointer ${
                 tab === 'business'
                   ? 'bg-white text-pink-deep shadow-[0_2px_8px_rgba(219,39,119,0.06)]'
-                  : 'text-gray-400 hover:text-pink-deep/80'
+                  : 'text-gray-500 hover:text-pink-deep/85 font-extrabold'
               }`}
             >
               💅 Business Booking
@@ -185,7 +185,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
               className={`flex-1 py-3 rounded-xl border-none font-sans text-xs font-black transition-all cursor-pointer ${
                 tab === 'personal'
                   ? 'bg-white text-pink-deep shadow-[0_2px_8px_rgba(219,39,119,0.06)]'
-                  : 'text-gray-400 hover:text-pink-deep/80'
+                  : 'text-gray-500 hover:text-pink-deep/85 font-extrabold'
               }`}
             >
               🌸 Personal Schedule
@@ -199,7 +199,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
             
             {/* Client Name */}
             <div className="flex flex-col gap-1.5">
-              <label className="font-sans text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">
+              <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
                 Client Name
               </label>
               <input
@@ -214,7 +214,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
 
             {/* Service Selection */}
             <div className="flex flex-col gap-1.5">
-              <label className="font-sans text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">
+              <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
                 Service
               </label>
               <div className="flex gap-2">
@@ -230,7 +230,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
                     className={`flex-1 py-2.5 rounded-xl text-xs font-black border-2 cursor-pointer transition-all ${
                       service === s.value
                         ? 'border-pink-primary bg-pink-soft/30 text-pink-deep'
-                        : 'border-pink-50/50 bg-white text-gray-400 hover:border-pink-100'
+                        : 'border-pink-50/50 bg-white text-gray-500 hover:border-pink-100 font-bold'
                     }`}
                   >
                     {s.label}
@@ -242,7 +242,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
             {/* Date & Time Row */}
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
-                <label className="font-sans text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">
+                <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
                   Date
                 </label>
                 <input
@@ -255,7 +255,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
               </div>
               
               <div className="flex flex-col gap-1.5">
-                <label className="font-sans text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">
+                <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
                   Time
                 </label>
                 <input
@@ -271,7 +271,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
             {/* Price & Duration Row */}
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
-                <label className="font-sans text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">
+                <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
                   Price ($)
                 </label>
                 <input
@@ -284,7 +284,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
               </div>
 
               <div className="flex flex-col gap-1.5">
-                <label className="font-sans text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">
+                <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
                   Duration
                 </label>
                 <select
@@ -303,7 +303,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
 
             {/* Notes */}
             <div className="flex flex-col gap-1.5">
-              <label className="font-sans text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">
+              <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
                 Notes (optional)
               </label>
               <textarea
@@ -322,7 +322,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
             
             {/* Title / Objective */}
             <div className="flex flex-col gap-1.5">
-              <label className="font-sans text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">
+              <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
                 What's it for?
               </label>
               <input
@@ -338,7 +338,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
             {/* Date & Time Row */}
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1.5">
-                <label className="font-sans text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">
+                <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
                   Date
                 </label>
                 <input
@@ -351,7 +351,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
               </div>
               
               <div className="flex flex-col gap-1.5">
-                <label className="font-sans text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">
+                <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
                   Time
                 </label>
                 <input
@@ -366,7 +366,7 @@ export default function AddView({ editAppt, onSave, onCancel }) {
 
             {/* Notes */}
             <div className="flex flex-col gap-1.5">
-              <label className="font-sans text-[11px] font-extrabold text-gray-400 uppercase tracking-wider">
+              <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
                 Notes (optional)
               </label>
               <textarea

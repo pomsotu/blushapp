@@ -135,29 +135,10 @@ export default function App() {
         <div className="hidden sm:block absolute right-[-3px] top-[138px] width-[3px] h-[68px] bg-[#2C2C2E] rounded-r-md" />
 
         {/* Screen Area (Full screen on mobile, nested inside bezel on desktop) */}
-        <div className="absolute inset-0 sm:inset-3 bg-pink-soft/30 sm:rounded-[46px] overflow-hidden flex flex-col shadow-inner">
+        <div className="absolute inset-0 sm:inset-3 bg-pink-soft/30 sm:rounded-[46px] overflow-hidden flex flex-col shadow-inner pt-2 sm:pt-8">
           
-          {/* Mobile Status Bar */}
-          <div className="bg-pink-soft/20 px-6 pt-[11px] pb-[4px] flex items-center justify-between flex-shrink-0 relative z-10">
-            <span className="font-sans text-[12px] font-black text-gray-800">9:41</span>
-            
-            {/* Dynamic Island Bezel */}
-            <div className="hidden sm:block absolute left-1/2 top-[7px] -translate-x-1/2 w-[106px] h-[28px] bg-black rounded-[18px]" />
-            
-            {/* Right side connection icons */}
-            <div className="flex gap-1.5 items-center">
-              <svg width="15" height="11" viewBox="0 0 15 11" fill="currentColor" className="text-gray-800">
-                <rect x="0" y="8" width="2.5" height="3" rx="0.5" />
-                <rect x="3.5" y="5.5" width="2.5" height="5.5" rx="0.5" />
-                <rect x="7" y="3" width="2.5" height="8" rx="0.5" />
-                <rect x="10.5" y="0" width="2.5" height="11" rx="0.5" />
-              </svg>
-              <svg width="13" height="11" viewBox="0 0 13 11" fill="none" stroke="currentColor" strokeWidth="1.5" className="text-gray-800">
-                <path d="M1 3.5C3 1.8 5 1 6.5 1S10 1.8 12 3.5" strokeLinecap="round" />
-                <circle cx="6.5" cy="9" r="1" fill="currentColor" />
-              </svg>
-            </div>
-          </div>
+          {/* Desktop-only floating Dynamic Island bezel (Floats over the screen content on desktop only) */}
+          <div className="hidden sm:block absolute left-1/2 top-[12px] -translate-x-1/2 w-[106px] h-[28px] bg-black rounded-[18px] z-30" />
 
           {/* View Container (Scrollable screen body) */}
           <div className="flex-1 overflow-y-auto no-scrollbar pb-6 bg-gradient-to-b from-pink-soft/20 via-[#FDF5FF] to-pink-soft/30">
@@ -171,7 +152,7 @@ export default function App() {
             <button
               onClick={() => setCurrentView('home')}
               className={`flex-1 flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer transition-all ${
-                currentView === 'home' ? 'text-pink-deep scale-105' : 'text-gray-300'
+                currentView === 'home' ? 'text-pink-deep scale-105' : 'text-[#8E7E89] hover:text-pink-deep/80'
               }`}
             >
               <HomeIco active={currentView === 'home'} />
@@ -181,7 +162,7 @@ export default function App() {
             <button
               onClick={() => setCurrentView('cal')}
               className={`flex-1 flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer transition-all ${
-                currentView === 'cal' ? 'text-pink-deep scale-105' : 'text-gray-300'
+                currentView === 'cal' ? 'text-pink-deep scale-105' : 'text-[#8E7E89] hover:text-pink-deep/80'
               }`}
             >
               <CalIco active={currentView === 'cal'} />
@@ -192,7 +173,7 @@ export default function App() {
             <div className="flex-1 flex justify-center -mt-8 relative">
               <button
                 onClick={handleAddNewAppt}
-                className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-primary to-pink-deep flex items-center justify-center shadow-[0_6px_20px_rgba(219,39,119,0.35)] border-4 border-white transition-all transform hover:scale-105 cursor-pointer active:scale-95"
+                className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-primary to-pink-deep flex items-center justify-center shadow-[0_6px_20px_rgba(219,39,119,0.35)] border-4 border-white transition-all transform hover:scale-105 cursor-pointer active:scale-95 z-20"
               >
                 <AddIco />
               </button>
@@ -201,7 +182,7 @@ export default function App() {
             <button
               onClick={() => setCurrentView('hist')}
               className={`flex-1 flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer transition-all ${
-                currentView === 'hist' ? 'text-pink-deep scale-105' : 'text-gray-300'
+                currentView === 'hist' ? 'text-pink-deep scale-105' : 'text-[#8E7E89] hover:text-pink-deep/80'
               }`}
             >
               <HistIco active={currentView === 'hist'} />
@@ -211,7 +192,7 @@ export default function App() {
             <button
               onClick={() => setCurrentView('settings')}
               className={`flex-1 flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer transition-all ${
-                currentView === 'settings' ? 'text-pink-deep scale-105' : 'text-gray-300'
+                currentView === 'settings' ? 'text-pink-deep scale-105' : 'text-[#8E7E89] hover:text-pink-deep/80'
               }`}
             >
               <SettingsIco active={currentView === 'settings'} />

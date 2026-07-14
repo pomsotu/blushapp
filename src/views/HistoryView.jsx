@@ -44,22 +44,22 @@ export default function HistoryView() {
         {/* Stats Row */}
         <div className="flex gap-3">
           <div className="glass-card rounded-2xl p-4 flex-1 flex flex-col justify-between">
-            <span className="font-sans text-[9px] font-extrabold uppercase tracking-widest text-white/80">
+            <span className="font-sans text-[9px] font-black uppercase tracking-widest text-pink-100">
               COMPLETED
             </span>
             <div className="mt-2">
               <div className="font-sans text-[22px] font-black leading-none">{completedCount}</div>
-              <div className="font-sans text-[11px] font-bold text-white/70 mt-1">appointments</div>
+              <div className="font-sans text-[11px] font-bold text-white/95 mt-1">appointments</div>
             </div>
           </div>
 
           <div className="glass-card rounded-2xl p-4 flex-1 flex flex-col justify-between">
-            <span className="font-sans text-[9px] font-extrabold uppercase tracking-widest text-white/80">
+            <span className="font-sans text-[9px] font-black uppercase tracking-widest text-pink-100">
               TOTAL EARNED
             </span>
             <div className="mt-2">
               <div className="font-sans text-[22px] font-black leading-none">${totalEarned}</div>
-              <div className="font-sans text-[11px] font-bold text-white/70 mt-1">all time</div>
+              <div className="font-sans text-[11px] font-bold text-white/95 mt-1">all time</div>
             </div>
           </div>
         </div>
@@ -81,7 +81,7 @@ export default function HistoryView() {
               className={`flex-1 py-2 rounded-xl border-none font-sans text-xs font-black transition-all cursor-pointer ${
                 filter === item.value
                   ? 'bg-white text-pink-deep shadow-[0_1px_5px_rgba(219,39,119,0.06)]'
-                  : 'text-gray-400 hover:text-pink-deep/80'
+                  : 'text-gray-500 hover:text-pink-deep/85 font-extrabold'
               }`}
             >
               {item.label}
@@ -93,7 +93,7 @@ export default function HistoryView() {
         {pastAppts.length === 0 ? (
           <div className="bg-white rounded-2xl p-8 text-center shadow-[0_4px_16px_rgba(244,114,182,0.03)] border border-pink-100/50 my-4">
             <div className="text-3xl mb-2">📋</div>
-            <div className="font-sans text-sm text-gray-400 font-bold leading-normal">
+            <div className="font-sans text-sm text-gray-500 font-bold leading-normal">
               No past appointments yet, Tari!
             </div>
           </div>
@@ -127,7 +127,7 @@ export default function HistoryView() {
                     <div className="font-sans font-bold text-gray-800 text-[13px] leading-tight truncate">
                       {isP ? appt.title : appt.clientName}
                     </div>
-                    <div className="font-sans text-[10px] text-gray-400 mt-1 font-semibold">
+                    <div className="font-sans text-[10px] text-gray-500 mt-1 font-bold">
                       {dateLabel} · {formatTime(appt.time)}
                       {!isP && ` · ${serviceLabels[appt.service] || appt.service}`}
                     </div>
@@ -137,7 +137,7 @@ export default function HistoryView() {
                   <div className="text-right flex-shrink-0">
                     {appt.price != null && !isP && (
                       <div className={`font-sans font-extrabold text-[13px] ${
-                        appt.status === 'completed' ? 'text-pink-deep' : 'text-gray-400'
+                        appt.status === 'completed' ? 'text-pink-deep' : 'text-gray-500'
                       }`}>
                         ${appt.price}
                       </div>

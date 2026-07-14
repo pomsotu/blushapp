@@ -22,8 +22,8 @@ const serviceLabels = {
 
 export default function ApptCard({ appt, compact = false, showDate = false, onClick }) {
   const isPersonal = appt.type === 'personal';
-  const accentColor = isPersonal ? 'text-violet-500 border-violet-300' : 'text-pink-primary border-pink-200';
-  const bgClass = isPersonal ? 'bg-lavender-soft/60' : 'bg-pink-soft/40';
+  const accentColor = isPersonal ? 'text-violet-600' : 'text-pink-deep';
+  const bgClass = isPersonal ? 'bg-lavender-soft/80' : 'bg-pink-soft/60';
   const borderLeftColor = isPersonal ? 'border-l-violet-400' : 'border-l-pink-primary';
 
   const dateLabel = showDate
@@ -49,14 +49,14 @@ export default function ApptCard({ appt, compact = false, showDate = false, onCl
       {/* Details */}
       <div className="flex-1 min-w-0">
         {dateLabel && (
-          <div className="text-[10px] font-extrabold text-pink-deep/80 uppercase tracking-wider mb-0.5">
+          <div className="text-[10px] font-extrabold text-pink-deep uppercase tracking-wider mb-0.5">
             {dateLabel}
           </div>
         )}
         <div className="font-sans font-bold text-gray-800 text-[14px] leading-tight truncate">
           {isPersonal ? appt.title : appt.clientName}
         </div>
-        <div className="font-sans text-[11px] text-gray-400 mt-0.5 font-semibold flex items-center gap-1">
+        <div className="font-sans text-[11px] text-gray-500 mt-0.5 font-bold flex items-center gap-1">
           {isPersonal ? (
             <span>Personal 🌸</span>
           ) : (

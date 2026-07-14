@@ -27,22 +27,8 @@ export const checkOverlap = (date1, time1, duration1, date2, time2, duration2) =
   return start1 < end2 && start2 < end1;
 };
 
-// Initial mockup data
-const today = new Date();
-const fmt = (d) => d.toISOString().split('T')[0];
-const addDays = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
-
-const INITIAL_APPOINTMENTS = [
-  { id: "1", type: "business", clientName: "Sola", service: "braiding", price: 80, durationMins: 180, date: fmt(today), time: "14:00", status: "upcoming", notes: "Medium length box braids", createdAt: new Date().toISOString() },
-  { id: "2", type: "business", clientName: "Kemi", service: "nails", price: 40, durationMins: 60, date: fmt(today), time: "17:30", status: "upcoming", notes: "Acrylic set with cherry design", createdAt: new Date().toISOString() },
-  { id: "3", type: "personal", title: "Doctor's Visit", date: fmt(addDays(today, 1)), time: "10:00", status: "upcoming", notes: "Checkup at clinic", createdAt: new Date().toISOString() },
-  { id: "4", type: "business", clientName: "Lola", service: "both", price: 110, durationMins: 240, date: fmt(addDays(today, 2)), time: "13:00", status: "upcoming", notes: "Braids and full nail set combo", createdAt: new Date().toISOString() },
-  { id: "5", type: "personal", title: "Study Session", date: fmt(addDays(today, 4)), time: "09:00", status: "upcoming", notes: "Exam preparation with study group", createdAt: new Date().toISOString() },
-  { id: "6", type: "business", clientName: "Bisi", service: "nails", price: 45, durationMins: 75, date: fmt(addDays(today, 6)), time: "15:00", status: "upcoming", notes: "Gel manicure + pedicure", createdAt: new Date().toISOString() },
-  { id: "7", type: "business", clientName: "Amara", service: "nails", price: 45, durationMins: 90, date: fmt(addDays(today, -2)), time: "15:00", status: "completed", notes: "Refill and line art", createdAt: new Date().toISOString() },
-  { id: "8", type: "business", clientName: "Zara", service: "braiding", price: 75, durationMins: 150, date: fmt(addDays(today, -5)), time: "11:00", status: "completed", notes: "Knotless bob", createdAt: new Date().toISOString() },
-  { id: "9", type: "business", clientName: "Tolu", service: "both", price: 100, durationMins: 210, date: fmt(addDays(today, -7)), time: "13:00", status: "cancelled", notes: "Double booked - cancelled by client", createdAt: new Date().toISOString() }
-];
+// Empty database by default for production use
+const INITIAL_APPOINTMENTS = [];
 
 export const useAppStore = create(
   persist(

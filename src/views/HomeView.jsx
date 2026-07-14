@@ -37,7 +37,7 @@ export default function HomeView({ onEditAppt, onAddAppt }) {
         <div className="absolute right-[-20px] top-[-10px] text-white/10 text-9xl font-black pointer-events-none select-none">🌸</div>
         <div className="absolute left-[-30px] bottom-[-40px] text-white/5 text-9xl font-black pointer-events-none select-none">💅</div>
 
-        <div className="font-sans text-[11px] font-black uppercase tracking-wider text-pink-50/80">
+        <div className="font-sans text-[11px] font-black uppercase tracking-wider text-pink-50">
           {dayName}, {dateName}
         </div>
         <h1 className="font-serif italic text-[32px] font-extrabold mt-1 tracking-wide drop-shadow-sm">
@@ -49,23 +49,23 @@ export default function HomeView({ onEditAppt, onAddAppt }) {
           
           {/* Card 1: Bookings */}
           <div className="glass-card rounded-2xl p-4 flex-1 flex flex-col justify-between">
-            <span className="font-sans text-[9px] font-extrabold uppercase tracking-widest text-white/80">
+            <span className="font-sans text-[9px] font-black uppercase tracking-widest text-pink-100">
               TODAY'S BOOKINGS
             </span>
             <div className="mt-2.5">
               <div className="font-sans text-[26px] font-black leading-none">{todayAppts.length}</div>
-              <div className="font-sans text-[11px] font-bold text-white/70 mt-1">appointments</div>
+              <div className="font-sans text-[11px] font-bold text-white/90 mt-1">appointments</div>
             </div>
           </div>
           
           {/* Card 2: Revenue */}
           <div className="glass-card rounded-2xl p-4 flex-1 flex flex-col justify-between">
-            <span className="font-sans text-[9px] font-extrabold uppercase tracking-widest text-white/80">
+            <span className="font-sans text-[9px] font-black uppercase tracking-widest text-pink-100">
               EST. EARNINGS
             </span>
             <div className="mt-2.5">
               <div className="font-sans text-[26px] font-black leading-none">${earningsToday}</div>
-              <div className="font-sans text-[11px] font-bold text-white/70 mt-1">today</div>
+              <div className="font-sans text-[11px] font-bold text-white/90 mt-1">today</div>
             </div>
           </div>
 
@@ -77,14 +77,14 @@ export default function HomeView({ onEditAppt, onAddAppt }) {
         
         {/* Today's Section */}
         <div>
-          <div className="font-sans text-[11px] font-black text-pink-deep/50 uppercase tracking-widest mb-3">
+          <div className="font-sans text-[11px] font-black text-pink-deep/75 uppercase tracking-widest mb-3">
             Schedule Today
           </div>
           {todayAppts.length === 0 ? (
             <div className="bg-white rounded-2xl p-6 text-center shadow-[0_4px_16px_rgba(244,114,182,0.03)] border border-pink-100/50">
               <div className="text-3xl mb-2">🌸</div>
-              <div className="font-sans text-sm text-gray-400 font-bold leading-normal">
-                Nothing booked today — enjoy the free time, Tari! ✨
+              <div className="font-sans text-sm text-gray-500 font-bold leading-normal">
+                Nothing booked today, enjoy your free time Tari! ✨
               </div>
             </div>
           ) : (
@@ -99,7 +99,7 @@ export default function HomeView({ onEditAppt, onAddAppt }) {
         {/* Coming Up Section */}
         {upcomingAppts.length > 0 && (
           <div>
-            <div className="font-sans text-[11px] font-black text-pink-deep/50 uppercase tracking-widest mb-3">
+            <div className="font-sans text-[11px] font-black text-pink-deep/75 uppercase tracking-widest mb-3">
               Coming Up
             </div>
             <div className="flex flex-col gap-3">
