@@ -1,0 +1,42 @@
+@import "tailwindcss";
+
+@theme {
+  --color-pink-primary: #F472B6;
+  --color-pink-soft: #FCE7F3;
+  --color-pink-deep: #DB2777;
+  --color-lavender: #C4B5FD;
+  --color-lavender-soft: #F5F3FF;
+  --color-text-dark: #1F1F1F;
+  --color-text-muted: #9CA3AF;
+  
+  --font-serif: "Playfair Display", Georgia, serif;
+  --font-sans: "Nunito", system-ui, -apple-system, sans-serif;
+}
+
+@utility glass-card {
+  background: rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+@utility glass-card-solid {
+  background: rgba(255, 255, 255, 0.85);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+body {
+  font-family: var(--font-sans);
+  color: var(--color-text-dark);
+}
+
+/* Hide scrollbars but keep functionality */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

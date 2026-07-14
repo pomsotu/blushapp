@@ -1,0 +1,17 @@
+{
+  "name": "Blush Scheduling & Bookings",
+  "short_name": "Blush",
+  "description": "Personal Booking and Schedule for Tari",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#FCE7F3",
+  "theme_color": "#F472B6",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ]
+}
