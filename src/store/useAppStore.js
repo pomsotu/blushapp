@@ -3,12 +3,42 @@ import { persist } from 'zustand/middleware';
 
 // Trigger service worker reschedule
 const notifyServiceWorker = (appt, settings) => {
-  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator && navigator.serviceWorker.controller) {
     navigator.serviceWorker.controller.postMessage({
       type: 'SCHEDULE_REMINDERS',
       appt,
       settings
     });
+  }
+};
+
+// Direct notification dispatcher
+export const triggerDirectNotification = (title, options = {}) => {
+  if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') {
+    return false;
+  }
+
+  const notificationOptions = {
+    icon: '/icon.png',
+    badge: '/icon.png',
+    ...options
+  };
+
+  try {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'SHOW_IMMEDIATE_NOTIFICATION',
+        title,
+        options: notificationOptions
+      });
+      return true;
+    } else {
+      new Notification(title, notificationOptions);
+      return true;
+    }
+  } catch (e) {
+    console.warn('Direct notification error:', e);
+    return false;
   }
 };
 
@@ -34,10 +64,12 @@ export const useAppStore = create(
   persist(
     (set, get) => ({
       appointments: INITIAL_APPOINTMENTS,
+      notifiedHistory: {},
       settings: {
-        remind24h: true,
-        remind2h: true,
-        remind30m: true
+        remind30m: true,       // 30 mins before appointment
+        remind2hAfter: true,   // 2 hours after appointment (follow-up to mark completed/cancelled)
+        remind24h: false,      // 24 hours before
+        remind2h: false        // 2 hours before
       },
 
       // Conflict Check helper
@@ -61,6 +93,75 @@ export const useAppStore = create(
         });
       },
 
+      // Check and fire pending live alerts (called periodically and on app focus)
+      checkPendingNotifications: () => {
+        const state = get();
+        const { appointments, settings, notifiedHistory } = state;
+        const now = Date.now();
+        const updatedHistory = { ...notifiedHistory };
+        let historyChanged = false;
+
+        appointments.forEach((appt) => {
+          if (appt.status !== 'upcoming') return;
+
+          const [year, month, day] = appt.date.split('-').map(Number);
+          const [hour, minute] = appt.time.split(':').map(Number);
+          const startTime = new Date(year, month - 1, day, hour, minute).getTime();
+          const durationMins = appt.type === 'business' ? (appt.durationMins || 60) : 60;
+          const endTime = startTime + durationMins * 60 * 1000;
+
+          // 1. Check 30-minute Pre-Appointment Reminder
+          if (settings.remind30m) {
+            const reminderTime = startTime - 30 * 60 * 1000;
+            const reminderKey = `30m_${appt.id}_${appt.date}_${appt.time}`;
+
+            // Trigger window: between 30m before and start time
+            if (now >= reminderTime && now < startTime && !updatedHistory[reminderKey]) {
+              const title = appt.type === 'business' 
+                ? 'Upcoming Booking in 30 Mins 💅' 
+                : 'Upcoming Schedule in 30 Mins 🌸';
+              const body = appt.type === 'business'
+                ? `Tari, your appointment with ${appt.clientName} starts in 30 mins!`
+                : `Tari, your event "${appt.title}" starts in 30 mins!`;
+
+              triggerDirectNotification(title, {
+                body,
+                tag: reminderKey
+              });
+
+              updatedHistory[reminderKey] = now;
+              historyChanged = true;
+            }
+          }
+
+          // 2. Check 2-hour Post-Appointment Follow-up Reminder
+          if (settings.remind2hAfter) {
+            const followupTime = endTime + 2 * 60 * 60 * 1000;
+            const followupKey = `2hAfter_${appt.id}_${appt.date}_${appt.time}`;
+
+            // Trigger window: from 2 hours after end time up to 48 hours after
+            if (now >= followupTime && now <= (endTime + 48 * 60 * 60 * 1000) && !updatedHistory[followupKey]) {
+              const title = 'Appointment Follow-up ✨';
+              const body = appt.type === 'business'
+                ? `Did your appointment with ${appt.clientName} finish? Tap to mark it as completed or cancelled.`
+                : `Did your event "${appt.title}" finish? Tap to mark it as completed or cancelled.`;
+
+              triggerDirectNotification(title, {
+                body,
+                tag: followupKey
+              });
+
+              updatedHistory[followupKey] = now;
+              historyChanged = true;
+            }
+          }
+        });
+
+        if (historyChanged) {
+          set({ notifiedHistory: updatedHistory });
+        }
+      },
+
       // Store actions
       addAppointment: (appt) => {
         const id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
@@ -76,6 +177,8 @@ export const useAppStore = create(
         }));
 
         notifyServiceWorker(newAppt, get().settings);
+        // Immediate check in case the appointment is scheduled within 30 minutes
+        get().checkPendingNotifications();
       },
 
       updateAppointment: (id, updatedFields) => {
@@ -91,6 +194,8 @@ export const useAppStore = create(
           
           return { appointments: updatedAppts };
         });
+
+        get().checkPendingNotifications();
       },
 
       completeAppointment: (id) => {
@@ -99,7 +204,6 @@ export const useAppStore = create(
             a.id === id ? { ...a, status: 'completed' } : a
           );
           
-          // Clear reminders in service worker by sending status: 'completed'
           const completedAppt = updatedAppts.find((a) => a.id === id);
           if (completedAppt) {
             notifyServiceWorker({ ...completedAppt, status: 'completed' }, state.settings);
@@ -115,7 +219,6 @@ export const useAppStore = create(
             a.id === id ? { ...a, status: 'cancelled' } : a
           );
           
-          // Clear reminders in service worker by sending status: 'cancelled'
           const cancelledAppt = updatedAppts.find((a) => a.id === id);
           if (cancelledAppt) {
             notifyServiceWorker({ ...cancelledAppt, status: 'cancelled' }, state.settings);
@@ -137,6 +240,15 @@ export const useAppStore = create(
           });
 
           return { settings: mergedSettings };
+        });
+
+        get().checkPendingNotifications();
+      },
+
+      sendTestNotification: () => {
+        return triggerDirectNotification('Blush Alerts Active 🌸', {
+          body: 'Your appointment reminders and post-appointment follow-up alerts are working perfectly!',
+          tag: 'test_alert_' + Date.now()
         });
       },
 
@@ -166,6 +278,8 @@ export const useAppStore = create(
               notifyServiceWorker(appt, settings);
             }
           });
+
+          get().checkPendingNotifications();
 
           return { success: true };
         } catch (e) {

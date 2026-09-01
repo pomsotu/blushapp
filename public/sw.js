@@ -1,9 +1,10 @@
-const CACHE_NAME = 'blush-cache-v1';
+const CACHE_NAME = 'blush-cache-v2';
 const ASSETS = [
   '/',
   '/index.html',
   '/manifest.webmanifest',
-  '/favicon.ico',
+  '/favicon.svg',
+  '/icon.png',
   '/icon-192.png',
   '/icon-512.png'
 ];
@@ -66,48 +67,86 @@ self.addEventListener('fetch', (e) => {
 self.addEventListener('message', (event) => {
   const data = event.data;
   
-  if (data && data.type === 'SCHEDULE_REMINDERS') {
+  if (!data) return;
+
+  // Immediate notification trigger (for in-app alerts and test notifications)
+  if (data.type === 'SHOW_IMMEDIATE_NOTIFICATION') {
+    const { title, options } = data;
+    self.registration.showNotification(title, {
+      icon: '/icon.png',
+      badge: '/icon.png',
+      ...options
+    });
+    return;
+  }
+
+  if (data.type === 'SCHEDULE_REMINDERS') {
     const { appt, settings } = data;
     
     // Silence/clear any previous reminders for this appointment first
     clearRemindersForAppt(appt.id);
 
-    // If cancelled, do not schedule new ones
-    if (appt.status === 'cancelled') return;
+    // If cancelled or completed, do not schedule upcoming reminders
+    if (appt.status === 'cancelled' || appt.status === 'completed') return;
 
-    // Parse appointment time
-    const appointmentTime = new Date(`${appt.date}T${appt.time}:00`).getTime();
+    // Parse appointment start & end time
+    const [year, month, day] = appt.date.split('-').map(Number);
+    const [hour, minute] = appt.time.split(':').map(Number);
+    const startTime = new Date(year, month - 1, day, hour, minute).getTime();
+    const durationMins = appt.type === 'business' ? (appt.durationMins || 60) : 60;
+    const endTime = startTime + durationMins * 60 * 1000;
     const now = Date.now();
 
-    // Check reminder intervals: 24h, 2h, 30m
     const scheduleItems = [];
-    
-    if (settings.remind24h) {
-      const time24h = appointmentTime - 24 * 60 * 60 * 1000;
-      if (time24h > now) {
-        scheduleItems.push({
-          time: time24h,
-          body: `Tomorrow at ${formatTime(appt.time)}: ${appt.type === 'business' ? `Braiding/Nails for ${appt.clientName}` : appt.title} 🌸`
-        });
-      }
-    }
-    
-    if (settings.remind2h) {
-      const time2h = appointmentTime - 2 * 60 * 60 * 1000;
-      if (time2h > now) {
-        scheduleItems.push({
-          time: time2h,
-          body: `In 2 hours: ${appt.type === 'business' ? `${appt.service === 'both' ? 'Hair & Nails' : appt.service} for ${appt.clientName}` : appt.title}. Get ready! 💅`
-        });
-      }
-    }
 
+    // 1. 30 Minutes Before (Requested by Tari)
     if (settings.remind30m) {
-      const time30m = appointmentTime - 30 * 60 * 1000;
+      const time30m = startTime - 30 * 60 * 1000;
       if (time30m > now) {
         scheduleItems.push({
           time: time30m,
-          body: `Tari! Your appt starts in 30 mins: ${appt.type === 'business' ? `${appt.clientName} 🌸` : appt.title}`
+          title: appt.type === 'business' ? 'Upcoming Booking in 30 Mins 💅' : 'Upcoming Schedule in 30 Mins 🌸',
+          body: appt.type === 'business'
+            ? `Tari, your appointment with ${appt.clientName} starts in 30 mins!`
+            : `Tari, your event "${appt.title}" starts in 30 mins!`
+        });
+      }
+    }
+
+    // 2. 2 Hours After (Follow-up to mark completed/cancelled requested by Tari)
+    if (settings.remind2hAfter) {
+      const time2hAfter = endTime + 2 * 60 * 60 * 1000;
+      if (time2hAfter > now) {
+        scheduleItems.push({
+          time: time2hAfter,
+          title: 'Appointment Follow-up ✨',
+          body: appt.type === 'business'
+            ? `Did your appointment with ${appt.clientName} finish? Tap to mark it as completed or cancelled.`
+            : `Did your event "${appt.title}" finish? Tap to mark it as completed or cancelled.`
+        });
+      }
+    }
+
+    // 3. 24 Hours Before (Optional)
+    if (settings.remind24h) {
+      const time24h = startTime - 24 * 60 * 60 * 1000;
+      if (time24h > now) {
+        scheduleItems.push({
+          time: time24h,
+          title: 'Appointment Tomorrow 🌸',
+          body: `Tomorrow at ${formatTime(appt.time)}: ${appt.type === 'business' ? `Braiding/Nails for ${appt.clientName}` : appt.title}`
+        });
+      }
+    }
+    
+    // 4. 2 Hours Before (Optional)
+    if (settings.remind2h) {
+      const time2h = startTime - 2 * 60 * 60 * 1000;
+      if (time2h > now) {
+        scheduleItems.push({
+          time: time2h,
+          title: 'Appointment in 2 Hours 💅',
+          body: `In 2 hours: ${appt.type === 'business' ? `${appt.clientName}` : appt.title}. Get ready!`
         });
       }
     }
@@ -115,7 +154,7 @@ self.addEventListener('message', (event) => {
     // Register each scheduled alert
     scheduleItems.forEach((item, index) => {
       const reminderId = `${appt.id}_${index}`;
-      scheduleLocalReminder(reminderId, appt.type === 'business' ? 'Business Booking 💅' : 'Personal Schedule 🌸', item.body, item.time);
+      scheduleLocalReminder(reminderId, item.title, item.body, item.time);
     });
   }
 });
@@ -123,7 +162,7 @@ self.addEventListener('message', (event) => {
 // Clear reminders helper
 function clearRemindersForAppt(apptId) {
   // Clear active standard JS timeouts
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 6; i++) {
     const key = `${apptId}_${i}`;
     if (activeTimeouts.has(key)) {
       clearTimeout(activeTimeouts.get(key));
@@ -150,8 +189,8 @@ function scheduleLocalReminder(id, title, body, timestamp) {
     try {
       self.registration.showNotification(title, {
         body: body,
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
+        icon: '/icon.png',
+        badge: '/icon.png',
         tag: id,
         showTrigger: new TimestampTrigger(timestamp)
       });
@@ -167,8 +206,8 @@ function scheduleLocalReminder(id, title, body, timestamp) {
     const timeout = setTimeout(() => {
       self.registration.showNotification(title, {
         body: body,
-        icon: '/icon-192.png',
-        badge: '/icon-192.png',
+        icon: '/icon.png',
+        badge: '/icon.png',
         tag: id
       });
       activeTimeouts.delete(id);

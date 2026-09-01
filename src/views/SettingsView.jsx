@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 
 export default function SettingsView() {
@@ -6,12 +6,55 @@ export default function SettingsView() {
   const updateSettings = useAppStore((state) => state.updateSettings);
   const exportData = useAppStore((state) => state.exportData);
   const importData = useAppStore((state) => state.importData);
+  const sendTestNotification = useAppStore((state) => state.sendTestNotification);
 
   const fileInputRef = useRef(null);
   
+  // Notification permission state
+  const [permission, setPermission] = useState(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported'
+  );
+  const [testAlertStatus, setTestAlertStatus] = useState('');
+
   // UI status states
   const [exportStatus, setExportStatus] = useState('');
   const [importStatus, setImportStatus] = useState({ success: null, message: '' });
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setPermission(Notification.permission);
+    }
+  }, []);
+
+  const handleRequestPermission = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      try {
+        const res = await Notification.requestPermission();
+        setPermission(res);
+        if (res === 'granted') {
+          sendTestNotification();
+          setTestAlertStatus('Notifications active! Sent test alert 🌸');
+          setTimeout(() => setTestAlertStatus(''), 4000);
+        }
+      } catch (e) {
+        console.warn('Notification permission error:', e);
+      }
+    }
+  };
+
+  const handleSendTestAlert = () => {
+    if (permission !== 'granted') {
+      handleRequestPermission();
+      return;
+    }
+    const sent = sendTestNotification();
+    if (sent) {
+      setTestAlertStatus('Test alert sent! Check your screen 🌸');
+    } else {
+      setTestAlertStatus('Please enable notifications first 🔔');
+    }
+    setTimeout(() => setTestAlertStatus(''), 4000);
+  };
 
   const handleToggle = (key) => {
     updateSettings({ [key]: !settings[key] });
@@ -80,34 +123,102 @@ export default function SettingsView() {
         </h1>
       </div>
 
-      <div className="px-5 pt-5 flex flex-col gap-6">
-         {/* Reminder Settings Card */}
+      <div className="px-5 pt-5 flex flex-col gap-5 pb-8">
+        
+        {/* Phone Notifications Setup Card */}
+        <div className="bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(244,114,182,0.03)] border border-pink-100/50 flex flex-col gap-3.5">
+          <div className="flex items-center justify-between border-b border-pink-100 pb-2.5">
+            <h2 className="font-serif italic text-lg text-pink-deep font-bold">
+              Push Notifications
+            </h2>
+            <span className={`text-[10px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full ${
+              permission === 'granted'
+                ? 'bg-green-50 text-green-600 border border-green-200/60'
+                : permission === 'denied'
+                ? 'bg-red-50 text-red-500 border border-red-200/60'
+                : 'bg-pink-50 text-pink-deep border border-pink-200/60'
+            }`}>
+              {permission === 'granted' ? 'Active 🟢' : permission === 'denied' ? 'Blocked ⚠️' : 'Setup Needed 🔔'}
+            </span>
+          </div>
+
+          <p className="font-sans text-gray-500 text-xs font-semibold leading-relaxed">
+            Allow Blush to send alerts 30 mins before appointments and follow-ups 2 hours after to keep your schedule accurate.
+          </p>
+
+          <div className="flex flex-col gap-2">
+            {permission !== 'granted' && (
+              <button
+                onClick={handleRequestPermission}
+                className="w-full py-3 rounded-2xl bg-gradient-to-r from-pink-primary to-pink-deep text-white font-extrabold text-xs shadow-md shadow-pink-primary/20 hover:opacity-95 transition-all cursor-pointer flex items-center justify-center gap-2"
+              >
+                🔔 Enable Notifications on this Device
+              </button>
+            )}
+
+            <button
+              onClick={handleSendTestAlert}
+              className="w-full py-2.5 rounded-2xl bg-pink-soft/50 text-pink-deep hover:bg-pink-soft font-black text-xs transition-all border border-pink-100/40 cursor-pointer flex items-center justify-center gap-2"
+            >
+              🌸 Send Test Notification
+            </button>
+
+            {testAlertStatus && (
+              <div className="text-center font-sans text-xs font-bold text-pink-deep animate-pulse mt-1">
+                {testAlertStatus}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Reminder Settings Card */}
         <div className="bg-white rounded-3xl p-5 shadow-[0_4px_20px_rgba(244,114,182,0.03)] border border-pink-100/50 flex flex-col gap-4">
           <h2 className="font-serif italic text-lg text-pink-deep font-bold border-b border-pink-100 pb-2">
-            Reminder Intervals
+            Reminder Schedule
           </h2>
           <p className="font-sans text-gray-500 text-xs font-semibold -mt-2 leading-relaxed">
-            Blush schedules offline push alerts leading up to appointments. Select when you want Tari to be notified:
+            Choose when you want Tari to receive alerts for scheduled appointments:
           </p>
 
           <div className="flex flex-col gap-3">
             {[
-              { key: 'remind24h', title: '⏰ 24 Hours Before', desc: 'Tomorrow at 3PM: Braiding for Sola 🌸' },
-              { key: 'remind2h', title: '⏰ 2 Hours Before', desc: 'In 2 hours: Braiding for Sola. Get ready!' },
-              { key: 'remind30m', title: '⏰ 30 Minutes Before', desc: 'Tari! Your 3PM appointment starts in 30 mins 💅' }
+              { 
+                key: 'remind30m', 
+                title: '⏰ 30 Minutes Before (Recommended)', 
+                desc: 'Tari, your 3PM appointment starts in 30 mins 💅',
+                badge: 'Primary'
+              },
+              { 
+                key: 'remind2hAfter', 
+                title: '✨ 2 Hours After (Follow-up)', 
+                desc: 'Did your appointment finish? Tap to mark completed or cancelled',
+                badge: 'Follow-up'
+              },
+              { 
+                key: 'remind2h', 
+                title: '⏰ 2 Hours Before', 
+                desc: 'In 2 hours: Braiding for Sola. Get ready!' 
+              },
+              { 
+                key: 'remind24h', 
+                title: '⏰ 24 Hours Before', 
+                desc: 'Tomorrow at 3PM: Braiding for Sola 🌸' 
+              }
             ].map((opt) => (
               <div 
                 key={opt.key}
                 onClick={() => handleToggle(opt.key)}
                 className="flex items-center justify-between p-2.5 rounded-xl hover:bg-pink-soft/10 transition-all cursor-pointer"
               >
-                <div>
-                  <div className="font-sans font-bold text-gray-800 text-[13px]">{opt.title}</div>
-                  <div className="font-sans text-[10px] text-gray-500 mt-0.5 font-bold">{opt.desc}</div>
+                <div className="pr-3">
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-sans font-bold text-gray-800 text-[13px]">{opt.title}</span>
+                  </div>
+                  <div className="font-sans text-[10px] text-gray-500 mt-0.5 font-bold leading-normal">{opt.desc}</div>
                 </div>
                 
                 {/* Custom Toggle Switch */}
-                <div className={`w-11 h-6 rounded-full p-0.5 transition-all duration-200 ease-in-out ${
+                <div className={`w-11 h-6 rounded-full p-0.5 flex-shrink-0 transition-all duration-200 ease-in-out ${
                   settings[opt.key] ? 'bg-pink-primary' : 'bg-gray-200'
                 }`}>
                   <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-all duration-200 ease-in-out transform ${
@@ -168,7 +279,7 @@ export default function SettingsView() {
         </div>
 
         {/* Info footer */}
-        <div className="text-center text-[10px] text-gray-500 font-bold uppercase tracking-wider py-4">
+        <div className="text-center text-[10px] text-gray-500 font-bold uppercase tracking-wider py-2">
           Blush PWA MVP · Built with love for Tari 🌸
         </div>
 

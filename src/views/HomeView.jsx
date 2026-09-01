@@ -4,10 +4,13 @@ import ApptCard from '../components/ApptCard';
 
 export default function HomeView({ onEditAppt, onAddAppt }) {
   const appointments = useAppStore((state) => state.appointments);
+  const completeAppointment = useAppStore((state) => state.completeAppointment);
+  const cancelAppointment = useAppStore((state) => state.cancelAppointment);
 
   // Get current date strings
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
+  const now = Date.now();
   const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
   const dateName = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
 
@@ -22,6 +25,30 @@ export default function HomeView({ onEditAppt, onAddAppt }) {
     .filter((a) => a.date > todayStr)
     .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
     .slice(0, 4);
+
+  // 1. Calculate 30-minute Pre-Appointment Alert item
+  const startingSoonAppt = upcoming.find((appt) => {
+    const [year, month, day] = appt.date.split('-').map(Number);
+    const [hour, minute] = appt.time.split(':').map(Number);
+    const startTime = new Date(year, month - 1, day, hour, minute).getTime();
+    const durationMins = appt.type === 'business' ? (appt.durationMins || 60) : 60;
+    const endTime = startTime + durationMins * 60 * 1000;
+    
+    // Starts within 30 minutes, or currently ongoing
+    return now >= (startTime - 30 * 60 * 1000) && now <= endTime;
+  });
+
+  // 2. Calculate 2-Hour Post-Appointment Follow-up items (ended 2+ hours ago and still marked upcoming)
+  const pendingFollowups = appointments.filter((appt) => {
+    if (appt.status !== 'upcoming') return false;
+    const [year, month, day] = appt.date.split('-').map(Number);
+    const [hour, minute] = appt.time.split(':').map(Number);
+    const startTime = new Date(year, month - 1, day, hour, minute).getTime();
+    const durationMins = appt.type === 'business' ? (appt.durationMins || 60) : 60;
+    const endTime = startTime + durationMins * 60 * 1000;
+    
+    return now >= (endTime + 2 * 60 * 60 * 1000);
+  });
 
   // Calculate earnings for today's business bookings
   const earningsToday = todayAppts
@@ -73,7 +100,79 @@ export default function HomeView({ onEditAppt, onAddAppt }) {
       </div>
 
       {/* Main Body Section */}
-      <div className="px-5 pt-6 flex flex-col gap-6">
+      <div className="px-5 pt-5 flex flex-col gap-5">
+        
+        {/* Starting Soon Alert Banner */}
+        {startingSoonAppt && (
+          <div 
+            onClick={() => onEditAppt(startingSoonAppt)}
+            className="bg-gradient-to-r from-pink-500 to-pink-600 rounded-2xl p-3.5 text-white shadow-lg shadow-pink-500/25 flex items-center justify-between cursor-pointer transition-all hover:opacity-95"
+          >
+            <div className="flex items-center gap-3">
+              <span className="text-2xl animate-bounce">⏰</span>
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-wider text-pink-100">Starting Soon · 30m Alert</div>
+                <div className="text-[14px] font-black leading-tight">
+                  {startingSoonAppt.type === 'business' ? startingSoonAppt.clientName : startingSoonAppt.title} at {startingSoonAppt.time}
+                </div>
+              </div>
+            </div>
+            <span className="text-[11px] font-black bg-white/20 px-2.5 py-1 rounded-full">View ›</span>
+          </div>
+        )}
+
+        {/* 2-Hour Post-Appointment Follow-ups Card */}
+        {pendingFollowups.length > 0 && (
+          <div className="bg-gradient-to-br from-amber-50 to-orange-50/60 border border-amber-200/90 rounded-2xl p-4 shadow-sm flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <div className="font-sans text-[11px] font-black text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
+                <span>✨ Follow-up Reminder (2h+ ago)</span>
+              </div>
+              <span className="text-[10px] font-extrabold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full">
+                {pendingFollowups.length} action needed
+              </span>
+            </div>
+            
+            <p className="font-sans text-xs text-amber-900/90 font-semibold leading-relaxed">
+              These appointments have passed. Please update the status so your records stay accurate:
+            </p>
+
+            <div className="flex flex-col gap-2.5">
+              {pendingFollowups.map((appt) => (
+                <div key={appt.id} className="bg-white rounded-xl p-3 border border-amber-200/60 shadow-sm flex flex-col gap-2.5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="font-sans font-black text-[13px] text-gray-800">
+                        {appt.type === 'business' ? appt.clientName : appt.title}
+                      </div>
+                      <div className="font-sans text-[10px] text-gray-500 font-bold mt-0.5">
+                        {appt.date} · {appt.time} {appt.type === 'business' ? `(${appt.service})` : '(Personal)'}
+                      </div>
+                    </div>
+                    {appt.price != null && appt.type === 'business' && (
+                      <div className="font-sans font-black text-pink-deep text-[13px]">${appt.price}</div>
+                    )}
+                  </div>
+                  
+                  <div className="flex gap-2 pt-1 border-t border-gray-100">
+                    <button
+                      onClick={() => completeAppointment(appt.id)}
+                      className="flex-1 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-extrabold text-[11px] shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      ✓ Completed
+                    </button>
+                    <button
+                      onClick={() => cancelAppointment(appt.id)}
+                      className="flex-1 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 font-extrabold text-[11px] transition-all cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      ✗ Cancelled
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         
         {/* Today's Section */}
         <div>

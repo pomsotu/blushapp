@@ -54,7 +54,7 @@ export default function App() {
   const [currentView, setCurrentView] = useState('home');
   const [editingAppt, setEditingAppt] = useState(null);
 
-  // Register PWA Service Worker & Request Notification Permission
+  // Register PWA Service Worker & set up Live Notification Watcher
   useEffect(() => {
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js')
@@ -66,10 +66,29 @@ export default function App() {
         });
     }
 
-    // Request notification permission if not asked yet
-    if ('Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission();
-    }
+    // Initial check for pending alerts
+    useAppStore.getState().checkPendingNotifications();
+
+    // Check periodically every 30 seconds while the app is running
+    const interval = setInterval(() => {
+      useAppStore.getState().checkPendingNotifications();
+    }, 30000);
+
+    // Also check immediately when Tari returns to or focuses the app tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        useAppStore.getState().checkPendingNotifications();
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleVisibilityChange);
+    };
   }, []);
 
   const handleEditAppt = (appt) => {

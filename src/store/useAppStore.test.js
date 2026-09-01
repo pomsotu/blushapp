@@ -116,5 +116,59 @@ describe('useAppStore test suite', () => {
       const hasConflict3 = useAppStore.getState().checkConflict(appt3);
       expect(hasConflict3).toBe(false);
     });
+
+    it('should track 30m pre-appointment and 2h follow-up alerts in notifiedHistory', () => {
+      const now = new Date();
+      
+      // Appointment starting in 15 minutes (within 30m window)
+      const startIn15 = new Date(now.getTime() + 15 * 60 * 1000);
+      const appt1Date = startIn15.toISOString().split('T')[0];
+      const appt1Time = `${String(startIn15.getHours()).padStart(2, '0')}:${String(startIn15.getMinutes()).padStart(2, '0')}`;
+
+      // Appointment ended 3 hours ago (past 2h follow-up window)
+      const ended3hAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000); // started 4 hours ago, 1h duration -> ended 3 hours ago
+      const appt2Date = ended3hAgo.toISOString().split('T')[0];
+      const appt2Time = `${String(ended3hAgo.getHours()).padStart(2, '0')}:${String(ended3hAgo.getMinutes()).padStart(2, '0')}`;
+
+      useAppStore.setState({
+        appointments: [
+          {
+            id: 'appt-soon',
+            type: 'business',
+            clientName: 'Sola',
+            service: 'braiding',
+            date: appt1Date,
+            time: appt1Time,
+            durationMins: 60,
+            status: 'upcoming'
+          },
+          {
+            id: 'appt-past',
+            type: 'business',
+            clientName: 'Kemi',
+            service: 'nails',
+            date: appt2Date,
+            time: appt2Time,
+            durationMins: 60,
+            status: 'upcoming'
+          }
+        ],
+        notifiedHistory: {},
+        settings: {
+          remind30m: true,
+          remind2hAfter: true,
+          remind24h: false,
+          remind2h: false
+        }
+      });
+
+      // Run checkPendingNotifications
+      useAppStore.getState().checkPendingNotifications();
+      const history = useAppStore.getState().notifiedHistory;
+
+      // Expect both 30m alert and 2hAfter follow-up alert keys to be registered in history
+      expect(history[`30m_appt-soon_${appt1Date}_${appt1Time}`]).toBeDefined();
+      expect(history[`2hAfter_appt-past_${appt2Date}_${appt2Time}`]).toBeDefined();
+    });
   });
 });
