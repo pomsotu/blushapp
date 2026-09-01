@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import ConflictModal from '../components/ConflictModal';
+import { getOshawaTodayStr } from '../utils/dateUtils';
 
 const durationOptions = [
   { label: '1 hr', value: 60 },
@@ -58,8 +59,8 @@ export default function AddView({ editAppt, onSave, onCancel }) {
         setTitle(editAppt.title || '');
       }
     } else {
-      // Default to today
-      setDate(new Date().toISOString().split('T')[0]);
+      // Default to today in Oshawa / Eastern Time
+      setDate(getOshawaTodayStr());
     }
   }, [editAppt, isEditing]);
 

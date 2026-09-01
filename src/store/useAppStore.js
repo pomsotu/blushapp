@@ -1,5 +1,46 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { parseAppointmentTime, getOshawaTodayStr } from '../utils/dateUtils';
+
+// Soft, pleasant blossom chime for in-app and active tab alerts
+export const playAlertChime = () => {
+  if (typeof window === 'undefined') return;
+  setTimeout(() => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      
+      const now = ctx.currentTime;
+      
+      // Note 1 (E5 - 659.25 Hz)
+      const osc1 = ctx.createOscillator();
+      const gain1 = ctx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(659.25, now);
+      gain1.gain.setValueAtTime(0.2, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+      osc1.connect(gain1);
+      gain1.connect(ctx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.45);
+
+      // Note 2 (B5 - 987.77 Hz)
+      const osc2 = ctx.createOscillator();
+      const gain2 = ctx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(987.77, now + 0.12);
+      gain2.gain.setValueAtTime(0.25, now + 0.12);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
+      osc2.connect(gain2);
+      gain2.connect(ctx.destination);
+      osc2.start(now + 0.12);
+      osc2.stop(now + 0.75);
+    } catch (e) {
+      // Audio context may be restricted before first interaction
+    }
+  }, 0);
+};
 
 // Trigger service worker reschedule
 const notifyServiceWorker = (appt, settings) => {
@@ -12,34 +53,68 @@ const notifyServiceWorker = (appt, settings) => {
   }
 };
 
-// Direct notification dispatcher
-export const triggerDirectNotification = (title, options = {}) => {
-  if (typeof window === 'undefined' || !('Notification' in window) || Notification.permission !== 'granted') {
+// Direct notification dispatcher with mobile & desktop compatibility
+export const triggerDirectNotification = async (title, options = {}) => {
+  if (typeof window === 'undefined' || !('Notification' in window)) {
     return false;
   }
 
   const notificationOptions = {
     icon: '/icon.png',
     badge: '/icon.png',
+    vibrate: [200, 100, 200],
     ...options
   };
 
-  try {
-    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+  // Play audio chime asynchronously
+  playAlertChime();
+
+  if (Notification.permission !== 'granted') {
+    return false;
+  }
+
+  // 1. PostMessage to Service Worker controller if available
+  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+    try {
       navigator.serviceWorker.controller.postMessage({
         type: 'SHOW_IMMEDIATE_NOTIFICATION',
         title,
         options: notificationOptions
       });
       return true;
-    } else {
-      new Notification(title, notificationOptions);
+    } catch (e) {
+      console.warn('SW message dispatch failed:', e);
+    }
+  }
+
+  // 2. Direct browser Notification constructor (desktop Chrome, Firefox, Edge, Safari)
+  try {
+    if (typeof Notification === 'function') {
+      const notif = new Notification(title, notificationOptions);
+      notif.onclick = () => {
+        window.focus();
+        notif.close();
+      };
       return true;
     }
-  } catch (e) {
-    console.warn('Direct notification error:', e);
-    return false;
+  } catch (err) {
+    console.warn('Direct Notification constructor failed, trying SW registration:', err);
   }
+
+  // 3. Fallback via serviceWorker.getRegistration
+  try {
+    if ('serviceWorker' in navigator) {
+      const reg = await navigator.serviceWorker.getRegistration();
+      if (reg && reg.showNotification) {
+        await reg.showNotification(title, notificationOptions);
+        return true;
+      }
+    }
+  } catch (err2) {
+    console.warn('SW registration showNotification failed:', err2);
+  }
+
+  return false;
 };
 
 // Check if two time slots overlap
@@ -48,7 +123,7 @@ export const checkOverlap = (date1, time1, duration1, date2, time2, duration2) =
 
   const [h1, m1] = time1.split(':').map(Number);
   const start1 = h1 * 60 + m1;
-  const end1 = start1 + (duration1 || 60); // Default to 60m if not specified
+  const end1 = start1 + (duration1 || 60);
 
   const [h2, m2] = time2.split(':').map(Number);
   const start2 = h2 * 60 + m2;
@@ -104,9 +179,7 @@ export const useAppStore = create(
         appointments.forEach((appt) => {
           if (appt.status !== 'upcoming') return;
 
-          const [year, month, day] = appt.date.split('-').map(Number);
-          const [hour, minute] = appt.time.split(':').map(Number);
-          const startTime = new Date(year, month - 1, day, hour, minute).getTime();
+          const startTime = parseAppointmentTime(appt.date, appt.time);
           const durationMins = appt.type === 'business' ? (appt.durationMins || 60) : 60;
           const endTime = startTime + durationMins * 60 * 1000;
 

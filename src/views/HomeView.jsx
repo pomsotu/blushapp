@@ -1,18 +1,41 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import ApptCard from '../components/ApptCard';
+import { getOshawaTodayStr, parseAppointmentTime, TIMEZONE } from '../utils/dateUtils';
 
 export default function HomeView({ onEditAppt, onAddAppt }) {
   const appointments = useAppStore((state) => state.appointments);
   const completeAppointment = useAppStore((state) => state.completeAppointment);
   const cancelAppointment = useAppStore((state) => state.cancelAppointment);
+  const sendTestNotification = useAppStore((state) => state.sendTestNotification);
 
-  // Get current date strings
+  // Notification permission prompt state
+  const [notificationPermission, setNotificationPermission] = useState(
+    typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'granted'
+  );
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setNotificationPermission(Notification.permission);
+    }
+  }, []);
+
+  const handleEnableNotifications = async () => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      const res = await Notification.requestPermission();
+      setNotificationPermission(res);
+      if (res === 'granted') {
+        sendTestNotification();
+      }
+    }
+  };
+
+  // Get current date strings formatted in Oshawa/Eastern Time
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = getOshawaTodayStr(today);
   const now = Date.now();
-  const dayName = today.toLocaleDateString('en-US', { weekday: 'long' });
-  const dateName = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  const dayName = today.toLocaleDateString('en-US', { weekday: 'long', timeZone: TIMEZONE });
+  const dateName = today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', timeZone: TIMEZONE });
 
   // Filter appointments
   const upcoming = appointments.filter((a) => a.status === 'upcoming');
@@ -28,9 +51,7 @@ export default function HomeView({ onEditAppt, onAddAppt }) {
 
   // 1. Calculate 30-minute Pre-Appointment Alert item
   const startingSoonAppt = upcoming.find((appt) => {
-    const [year, month, day] = appt.date.split('-').map(Number);
-    const [hour, minute] = appt.time.split(':').map(Number);
-    const startTime = new Date(year, month - 1, day, hour, minute).getTime();
+    const startTime = parseAppointmentTime(appt.date, appt.time);
     const durationMins = appt.type === 'business' ? (appt.durationMins || 60) : 60;
     const endTime = startTime + durationMins * 60 * 1000;
     
@@ -41,9 +62,7 @@ export default function HomeView({ onEditAppt, onAddAppt }) {
   // 2. Calculate 2-Hour Post-Appointment Follow-up items (ended 2+ hours ago and still marked upcoming)
   const pendingFollowups = appointments.filter((appt) => {
     if (appt.status !== 'upcoming') return false;
-    const [year, month, day] = appt.date.split('-').map(Number);
-    const [hour, minute] = appt.time.split(':').map(Number);
-    const startTime = new Date(year, month - 1, day, hour, minute).getTime();
+    const startTime = parseAppointmentTime(appt.date, appt.time);
     const durationMins = appt.type === 'business' ? (appt.durationMins || 60) : 60;
     const endTime = startTime + durationMins * 60 * 1000;
     
@@ -102,6 +121,23 @@ export default function HomeView({ onEditAppt, onAddAppt }) {
       {/* Main Body Section */}
       <div className="px-5 pt-5 flex flex-col gap-5">
         
+        {/* Enable Notifications Callout (if not yet granted) */}
+        {notificationPermission === 'default' && (
+          <div 
+            onClick={handleEnableNotifications}
+            className="bg-white rounded-2xl p-3.5 border border-pink-200 shadow-sm flex items-center justify-between cursor-pointer hover:bg-pink-50/50 transition-all"
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="text-xl">🔔</span>
+              <div>
+                <div className="font-sans font-bold text-xs text-gray-800">Enable 30m & Follow-up Alerts</div>
+                <div className="font-sans text-[10px] text-gray-500 font-bold">Tap here to allow notifications on this device</div>
+              </div>
+            </div>
+            <span className="text-[10px] font-extrabold bg-pink-primary text-white px-2.5 py-1 rounded-full shadow-sm">Enable</span>
+          </div>
+        )}
+
         {/* Starting Soon Alert Banner */}
         {startingSoonAppt && (
           <div 

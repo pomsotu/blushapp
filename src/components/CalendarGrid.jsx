@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { getOshawaTodayStr } from '../utils/dateUtils';
 
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 const MONTHS = [
@@ -11,7 +12,7 @@ export default function CalendarGrid({ selectedDate, onSelectDay }) {
   const appointments = useAppStore((state) => state.appointments);
   
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  const todayStr = getOshawaTodayStr(today);
 
   const [viewYear, setViewYear] = useState((selectedDate || today).getFullYear());
   const [viewMonth, setViewMonth] = useState((selectedDate || today).getMonth());

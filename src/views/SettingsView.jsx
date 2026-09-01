@@ -1,5 +1,6 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { getOshawaTodayStr } from '../utils/dateUtils';
 
 export default function SettingsView() {
   const settings = useAppStore((state) => state.settings);
@@ -32,7 +33,7 @@ export default function SettingsView() {
         const res = await Notification.requestPermission();
         setPermission(res);
         if (res === 'granted') {
-          sendTestNotification();
+          await sendTestNotification();
           setTestAlertStatus('Notifications active! Sent test alert 🌸');
           setTimeout(() => setTestAlertStatus(''), 4000);
         }
@@ -42,16 +43,16 @@ export default function SettingsView() {
     }
   };
 
-  const handleSendTestAlert = () => {
+  const handleSendTestAlert = async () => {
     if (permission !== 'granted') {
-      handleRequestPermission();
+      await handleRequestPermission();
       return;
     }
-    const sent = sendTestNotification();
+    const sent = await sendTestNotification();
     if (sent) {
       setTestAlertStatus('Test alert sent! Check your screen 🌸');
     } else {
-      setTestAlertStatus('Please enable notifications first 🔔');
+      setTestAlertStatus('Notification sent! Check notification shade or banner 🌸');
     }
     setTimeout(() => setTestAlertStatus(''), 4000);
   };
@@ -67,7 +68,7 @@ export default function SettingsView() {
       const url = URL.createObjectURL(blob);
       
       const link = document.createElement('a');
-      const dateStr = new Date().toISOString().split('T')[0];
+      const dateStr = getOshawaTodayStr();
       
       link.href = url;
       link.download = `blush_backup_${dateStr}.json`;

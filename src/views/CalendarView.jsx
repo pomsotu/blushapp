@@ -2,13 +2,14 @@ import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import CalendarGrid from '../components/CalendarGrid';
 import ApptCard from '../components/ApptCard';
+import { getOshawaTodayStr, TIMEZONE } from '../utils/dateUtils';
 
 export default function CalendarView({ onEditAppt }) {
   const appointments = useAppStore((state) => state.appointments);
   const [selectedDate, setSelectedDate] = useState(new Date());
 
-  const selectedDateStr = selectedDate.toISOString().split('T')[0];
-  const todayStr = new Date().toISOString().split('T')[0];
+  const selectedDateStr = getOshawaTodayStr(selectedDate);
+  const todayStr = getOshawaTodayStr(new Date());
 
   // Filter appointments for the selected day
   const dayAppointments = appointments
@@ -20,7 +21,7 @@ export default function CalendarView({ onEditAppt }) {
   
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const isSelectedTomorrow = selectedDateStr === tomorrow.toISOString().split('T')[0];
+  const isSelectedTomorrow = selectedDateStr === getOshawaTodayStr(tomorrow);
 
   const dateLabel = isSelectedToday
     ? 'Today'
@@ -30,6 +31,7 @@ export default function CalendarView({ onEditAppt }) {
         weekday: 'long',
         month: 'long',
         day: 'numeric',
+        timeZone: TIMEZONE
       });
 
   return (

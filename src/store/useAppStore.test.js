@@ -122,12 +122,18 @@ describe('useAppStore test suite', () => {
       
       // Appointment starting in 15 minutes (within 30m window)
       const startIn15 = new Date(now.getTime() + 15 * 60 * 1000);
-      const appt1Date = startIn15.toISOString().split('T')[0];
+      const year1 = startIn15.getFullYear();
+      const month1 = String(startIn15.getMonth() + 1).padStart(2, '0');
+      const day1 = String(startIn15.getDate()).padStart(2, '0');
+      const appt1Date = `${year1}-${month1}-${day1}`;
       const appt1Time = `${String(startIn15.getHours()).padStart(2, '0')}:${String(startIn15.getMinutes()).padStart(2, '0')}`;
 
       // Appointment ended 3 hours ago (past 2h follow-up window)
       const ended3hAgo = new Date(now.getTime() - 4 * 60 * 60 * 1000); // started 4 hours ago, 1h duration -> ended 3 hours ago
-      const appt2Date = ended3hAgo.toISOString().split('T')[0];
+      const year2 = ended3hAgo.getFullYear();
+      const month2 = String(ended3hAgo.getMonth() + 1).padStart(2, '0');
+      const day2 = String(ended3hAgo.getDate()).padStart(2, '0');
+      const appt2Date = `${year2}-${month2}-${day2}`;
       const appt2Time = `${String(ended3hAgo.getHours()).padStart(2, '0')}:${String(ended3hAgo.getMinutes()).padStart(2, '0')}`;
 
       useAppStore.setState({
