@@ -13,12 +13,27 @@ export const getOshawaTodayStr = (d = new Date()) => {
   return formatter.format(date);
 };
 
-// Parse an appointment date and time into accurate epoch timestamp
+// Parse an appointment date and time into accurate epoch timestamp locked to Eastern Time (Oshawa, Canada)
 export const parseAppointmentTime = (dateStr, timeStr) => {
   if (!dateStr || !timeStr) return Date.now();
   const [year, month, day] = dateStr.split('-').map(Number);
   const [hour, minute] = timeStr.split(':').map(Number);
-  return new Date(year, month - 1, day, hour, minute, 0, 0).getTime();
+  const pad = (n) => String(n).padStart(2, '0');
+
+  try {
+    const testDate = new Date(Date.UTC(year, month - 1, day, 12, 0));
+    const tzParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: TIMEZONE,
+      timeZoneName: 'shortOffset'
+    }).formatToParts(testDate);
+    const offsetPart = tzParts.find((p) => p.type === 'timeZoneName')?.value || 'GMT-4';
+    const offsetMatch = offsetPart.match(/GMT([+-]\d+)/);
+    const offsetHours = offsetMatch ? Number(offsetMatch[1]) : -4;
+    const offsetStr = (offsetHours <= 0 ? '-' : '+') + pad(Math.abs(offsetHours)) + ':00';
+    return new Date(`${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00${offsetStr}`).getTime();
+  } catch (e) {
+    return new Date(year, month - 1, day, hour, minute, 0, 0).getTime();
+  }
 };
 
 // Format 24-hour time string into 12-hour AM/PM format

@@ -134,7 +134,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-pink-soft via-[#F3E8FF] to-pink-soft flex flex-col items-center justify-center p-0 sm:p-8 select-none">
+    <div className="min-h-screen bg-gradient-to-br from-pink-soft via-[#F3E8FF] to-pink-soft flex flex-col items-center justify-center p-0 sm:p-8">
       
       {/* Top Logo (Desktop only) */}
       <div className="hidden sm:block absolute top-6 z-20">
@@ -147,19 +147,19 @@ export default function App() {
       <div className="relative w-full h-screen sm:w-[375px] sm:h-[812px] flex-shrink-0">
         
         {/* iPhone Bezel (Desktop only) */}
-        <div className="hidden sm:block absolute inset-0 bg-[#1C1C1E] rounded-[48px] shadow-[0_40px_80px_rgba(219,39,119,0.18),0_0_0_1px_rgba(255,255,255,0.08)_inset]" />
+        <div className="hidden sm:block absolute inset-0 bg-[#1C1C1E] rounded-[48px] shadow-[0_40px_80px_rgba(219,39,119,0.18),0_0_0_1px_rgba(255,255,255,0.08)_inset] pointer-events-none" />
         
         {/* Side physical buttons (Desktop only) */}
-        <div className="hidden sm:block absolute left-[-3px] top-[108px] width-[3px] h-[30px] bg-[#2C2C2E] rounded-l-md" />
-        <div className="hidden sm:block absolute left-[-3px] top-[154px] width-[3px] h-[54px] bg-[#2C2C2E] rounded-l-md" />
-        <div className="hidden sm:block absolute left-[-3px] top-[216px] width-[3px] h-[54px] bg-[#2C2C2E] rounded-l-md" />
-        <div className="hidden sm:block absolute right-[-3px] top-[138px] width-[3px] h-[68px] bg-[#2C2C2E] rounded-r-md" />
+        <div className="hidden sm:block absolute left-[-3px] top-[108px] width-[3px] h-[30px] bg-[#2C2C2E] rounded-l-md pointer-events-none" />
+        <div className="hidden sm:block absolute left-[-3px] top-[154px] width-[3px] h-[54px] bg-[#2C2C2E] rounded-l-md pointer-events-none" />
+        <div className="hidden sm:block absolute left-[-3px] top-[216px] width-[3px] h-[54px] bg-[#2C2C2E] rounded-l-md pointer-events-none" />
+        <div className="hidden sm:block absolute right-[-3px] top-[138px] width-[3px] h-[68px] bg-[#2C2C2E] rounded-r-md pointer-events-none" />
 
         {/* Screen Area (Full screen on mobile, nested inside bezel on desktop) */}
         <div className="absolute inset-0 sm:inset-3 bg-pink-soft/30 sm:rounded-[46px] overflow-hidden flex flex-col shadow-inner pt-2 sm:pt-8 relative">
           
           {/* Desktop-only floating Dynamic Island bezel (Floats over the screen content on desktop only) */}
-          <div className="hidden sm:block absolute left-1/2 top-[12px] -translate-x-1/2 w-[106px] h-[28px] bg-black rounded-[18px] z-30" />
+          <div className="hidden sm:block absolute left-1/2 top-[12px] -translate-x-1/2 w-[106px] h-[28px] bg-black rounded-[18px] z-30 pointer-events-none" />
 
           {/* Floating In-App Heads-Up Notification Banner */}
           {activeToast && (
@@ -193,6 +193,7 @@ export default function App() {
             
             {/* Nav Items */}
             <button
+              data-testid="nav-home"
               onClick={() => setCurrentView('home')}
               className={`flex-1 flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer transition-all ${
                 currentView === 'home' ? 'text-pink-deep scale-105' : 'text-[#8E7E89] hover:text-pink-deep/80'
@@ -203,6 +204,7 @@ export default function App() {
             </button>
 
             <button
+              data-testid="nav-cal"
               onClick={() => setCurrentView('cal')}
               className={`flex-1 flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer transition-all ${
                 currentView === 'cal' ? 'text-pink-deep scale-105' : 'text-[#8E7E89] hover:text-pink-deep/80'
@@ -215,6 +217,7 @@ export default function App() {
             {/* Quick center Add button */}
             <div className="flex-1 flex justify-center -mt-8 relative">
               <button
+                data-testid="nav-add"
                 onClick={handleAddNewAppt}
                 className="w-14 h-14 rounded-full bg-gradient-to-tr from-pink-primary to-pink-deep flex items-center justify-center shadow-[0_6px_20px_rgba(219,39,119,0.35)] border-4 border-white transition-all transform hover:scale-105 cursor-pointer active:scale-95 z-20"
               >
@@ -223,6 +226,7 @@ export default function App() {
             </div>
 
             <button
+              data-testid="nav-hist"
               onClick={() => setCurrentView('hist')}
               className={`flex-1 flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer transition-all ${
                 currentView === 'hist' ? 'text-pink-deep scale-105' : 'text-[#8E7E89] hover:text-pink-deep/80'
@@ -233,6 +237,7 @@ export default function App() {
             </button>
 
             <button
+              data-testid="nav-settings"
               onClick={() => setCurrentView('settings')}
               className={`flex-1 flex flex-col items-center gap-1 bg-transparent border-none cursor-pointer transition-all ${
                 currentView === 'settings' ? 'text-pink-deep scale-105' : 'text-[#8E7E89] hover:text-pink-deep/80'
