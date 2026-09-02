@@ -176,5 +176,25 @@ describe('useAppStore test suite', () => {
       expect(history[`30m_appt-soon_${appt1Date}_${appt1Time}`]).toBeDefined();
       expect(history[`2hAfter_appt-past_${appt2Date}_${appt2Time}`]).toBeDefined();
     });
+
+    it('should reject malformed or malicious JSON imports securely', () => {
+      // Rejects non-array JSON
+      const res1 = useAppStore.getState().importData(JSON.stringify({ notAnArray: true }));
+      expect(res1.success).toBe(false);
+
+      // Rejects invalid date format
+      const res2 = useAppStore.getState().importData(JSON.stringify([
+        { id: '1', type: 'business', clientName: 'Attacker', date: '2026/07/14', time: '14:00', status: 'upcoming' }
+      ]));
+      expect(res2.success).toBe(false);
+
+      // Sanitizes and accepts valid backup payload
+      const res3 = useAppStore.getState().importData(JSON.stringify([
+        { id: '1', type: 'business', clientName: 'Valid Client', service: 'braiding', date: '2026-09-01', time: '14:00', status: 'upcoming', price: 80 }
+      ]));
+      expect(res3.success).toBe(true);
+      expect(useAppStore.getState().appointments).toHaveLength(1);
+      expect(useAppStore.getState().appointments[0].clientName).toBe('Valid Client');
+    });
   });
 });

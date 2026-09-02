@@ -342,26 +342,77 @@ export const useAppStore = create(
 
       importData: (jsonData) => {
         try {
-          const parsed = JSON.parse(jsonData);
-          if (!Array.isArray(parsed)) throw new Error('Data must be an array of appointments.');
-          
-          // Basic validation of fields
-          const isValid = parsed.every(appt => 
-            appt.id && 
-            appt.type && 
-            (appt.type === 'business' || appt.type === 'personal') &&
-            appt.date && 
-            appt.time && 
-            appt.status
-          );
-          
-          if (!isValid) throw new Error('Invalid appointment schema in JSON file.');
+          if (typeof jsonData !== 'string' || jsonData.length > 5 * 1024 * 1024) {
+            throw new Error('File payload exceeds maximum allowed size (5MB).');
+          }
 
-          set({ appointments: parsed });
+          const parsed = JSON.parse(jsonData);
+          if (!Array.isArray(parsed)) {
+            throw new Error('Backup data must contain an array of appointments.');
+          }
+
+          if (parsed.length > 10000) {
+            throw new Error('Backup data exceeds maximum appointment limit (10,000 items).');
+          }
+          
+          // Strict schema mapping and sanitization (prevents prototype pollution & invalid inputs)
+          const sanitizedAppts = parsed.map((item, index) => {
+            if (typeof item !== 'object' || item === null || Array.isArray(item)) {
+              throw new Error(`Item at position ${index + 1} is not a valid object.`);
+            }
+
+            // Reject prototype pollution attempts
+            if (Object.prototype.hasOwnProperty.call(item, '__proto__') || Object.prototype.hasOwnProperty.call(item, 'constructor')) {
+              throw new Error('Malicious payload detected.');
+            }
+
+            // Validate date (YYYY-MM-DD)
+            if (typeof item.date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(item.date)) {
+              throw new Error(`Invalid date format in record ${index + 1}. Expected YYYY-MM-DD.`);
+            }
+
+            // Validate time (HH:mm)
+            if (typeof item.time !== 'string' || !/^\d{2}:\d{2}$/.test(item.time)) {
+              throw new Error(`Invalid time format in record ${index + 1}. Expected HH:mm.`);
+            }
+
+            const id = typeof item.id === 'string' && item.id.trim() ? item.id.trim().slice(0, 64) : crypto.randomUUID();
+            const type = item.type === 'personal' ? 'personal' : 'business';
+            const status = ['upcoming', 'completed', 'cancelled'].includes(item.status) ? item.status : 'upcoming';
+            const notes = typeof item.notes === 'string' && item.notes.trim() ? item.notes.trim().slice(0, 2000) : null;
+            const createdAt = typeof item.createdAt === 'string' && item.createdAt ? item.createdAt.slice(0, 50) : new Date().toISOString();
+
+            const clean = {
+              id,
+              type,
+              status,
+              date: item.date,
+              time: item.time,
+              notes,
+              createdAt
+            };
+
+            if (type === 'business') {
+              clean.clientName = typeof item.clientName === 'string' && item.clientName.trim() ? item.clientName.trim().slice(0, 100) : 'Client';
+              clean.service = ['braiding', 'nails', 'both'].includes(item.service) ? item.service : 'braiding';
+              clean.durationMins = typeof item.durationMins === 'number' && Number.isFinite(item.durationMins) && item.durationMins > 0 && item.durationMins <= 1440 
+                ? Math.round(item.durationMins) 
+                : 60;
+              clean.price = typeof item.price === 'number' && Number.isFinite(item.price) && item.price >= 0 && item.price <= 100000 
+                ? Number(item.price.toFixed(2)) 
+                : null;
+            } else {
+              clean.title = typeof item.title === 'string' && item.title.trim() ? item.title.trim().slice(0, 150) : 'Personal Schedule';
+            }
+
+            return clean;
+          });
+
+          set({ appointments: sanitizedAppts });
           
           // Register reminders for all imported upcoming appointments
           const settings = get().settings;
-          parsed.forEach((appt) => {
+          sanitizedAppts.forEach((appt) => {
             if (appt.status === 'upcoming') {
               notifyServiceWorker(appt, settings);
             }
