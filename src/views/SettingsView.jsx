@@ -28,33 +28,73 @@ export default function SettingsView() {
   }, []);
 
   const handleRequestPermission = async () => {
-    if (typeof window !== 'undefined' && 'Notification' in window) {
-      try {
-        const res = await Notification.requestPermission();
-        setPermission(res);
-        if (res === 'granted') {
-          await sendTestNotification();
-          setTestAlertStatus('Notifications active! Sent test alert 🌸');
-          setTimeout(() => setTestAlertStatus(''), 4000);
-        }
-      } catch (e) {
-        console.warn('Notification permission error:', e);
-      }
+    if (typeof window === 'undefined') return;
+
+    if (!('Notification' in window)) {
+      setPermission('unsupported');
+      setTestAlertStatus('In-app alert & sound fired! 🌸 (Browser lacks Notification API)');
+      await sendTestNotification();
+      setTimeout(() => setTestAlertStatus(''), 5000);
+      return;
     }
+
+    try {
+      let res = Notification.permission;
+      if (res !== 'granted' && res !== 'denied') {
+        const permPromise = Notification.requestPermission();
+        if (permPromise && typeof permPromise.then === 'function') {
+          res = await permPromise;
+        } else {
+          res = await new Promise((resolve) => Notification.requestPermission(resolve));
+        }
+      }
+      setPermission(res);
+
+      // ALWAYS trigger test alert so Tari gets instant visual, sound, and haptic feedback
+      await sendTestNotification();
+
+      if (res === 'granted') {
+        setTestAlertStatus('Notifications active! Sent test alert 🌸');
+      } else if (res === 'denied') {
+        setTestAlertStatus('In-app alert fired 🌸 (System alerts blocked in browser settings)');
+      } else {
+        setTestAlertStatus('In-app alert fired 🌸');
+      }
+    } catch (e) {
+      console.warn('Notification permission error:', e);
+      await sendTestNotification();
+      setTestAlertStatus('In-app alert fired 🌸');
+    }
+    setTimeout(() => setTestAlertStatus(''), 5000);
   };
 
   const handleSendTestAlert = async () => {
-    if (permission !== 'granted') {
-      await handleRequestPermission();
-      return;
+    // Attempt permission request if still in default state
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      try {
+        const permPromise = Notification.requestPermission();
+        let res;
+        if (permPromise && typeof permPromise.then === 'function') {
+          res = await permPromise;
+        } else {
+          res = await new Promise((resolve) => Notification.requestPermission(resolve));
+        }
+        setPermission(res);
+      } catch (e) {}
     }
-    const sent = await sendTestNotification();
-    if (sent) {
-      setTestAlertStatus('Test alert sent! Check your screen 🌸');
+
+    // ALWAYS dispatch test notification immediately
+    await sendTestNotification();
+
+    const currentPerm = typeof window !== 'undefined' && 'Notification' in window ? Notification.permission : 'unsupported';
+    if (currentPerm === 'granted') {
+      setTestAlertStatus('Test alert sent! Check top banner & status bar 🌸');
+    } else if (currentPerm === 'denied') {
+      setTestAlertStatus('In-app alert fired 🌸 (OS alerts blocked in browser permissions)');
     } else {
-      setTestAlertStatus('Notification sent! Check notification shade or banner 🌸');
+      setTestAlertStatus('In-app alert sent! 🌸');
     }
-    setTimeout(() => setTestAlertStatus(''), 4000);
+    setTimeout(() => setTestAlertStatus(''), 5000);
   };
 
   const handleToggle = (key) => {
@@ -170,9 +210,15 @@ export default function SettingsView() {
               </div>
             )}
 
+            {permission === 'denied' && (
+              <div className="bg-red-50 border border-red-200/80 rounded-xl p-3 text-[11px] text-red-900 font-medium leading-relaxed mt-1">
+                <span className="font-bold">⚠️ Alerts blocked in browser:</span> Tap the tune/lock icon in your address bar → Permissions → Notifications → tap <b>Allow</b>, then tap Send Test Notification.
+              </div>
+            )}
+
             {typeof window !== 'undefined' && !window.isSecureContext && window.location.hostname !== 'localhost' && (
               <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-[11px] text-amber-900 font-medium leading-relaxed mt-1">
-                <span className="font-bold">📱 Android Testing Notice:</span> Android Chrome requires HTTPS for system lockscreen alerts. In-app popups and chimes work everywhere. Once hosted on Vercel with HTTPS, OS lockscreen alerts will appear automatically.
+                <span className="font-bold">📱 Android Local WiFi Notice:</span> Android requires HTTPS for OS lockscreen alerts. In-app popups and chimes work everywhere. Deploying to Vercel provides full HTTPS lockscreen alerts.
               </div>
             )}
           </div>

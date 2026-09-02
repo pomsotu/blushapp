@@ -22,12 +22,20 @@ export default function HomeView({ onEditAppt, onAddAppt }) {
 
   const handleEnableNotifications = async () => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
-      const res = await Notification.requestPermission();
-      setNotificationPermission(res);
-      if (res === 'granted') {
-        sendTestNotification();
-      }
+      try {
+        let res = Notification.permission;
+        if (res !== 'granted' && res !== 'denied') {
+          const permPromise = Notification.requestPermission();
+          if (permPromise && typeof permPromise.then === 'function') {
+            res = await permPromise;
+          } else {
+            res = await new Promise((resolve) => Notification.requestPermission(resolve));
+          }
+        }
+        setNotificationPermission(res);
+      } catch (e) {}
     }
+    await sendTestNotification();
   };
 
   // Get current date strings formatted in Oshawa/Eastern Time

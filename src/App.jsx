@@ -163,18 +163,19 @@ export default function App() {
 
           {/* Floating In-App Heads-Up Notification Banner */}
           {activeToast && (
-            <div className="absolute top-4 sm:top-10 left-3 right-3 z-50 animate-bounce">
-              <div className="bg-gradient-to-r from-pink-600 via-pink-500 to-pink-600 text-white p-3.5 rounded-2xl shadow-[0_12px_28px_rgba(219,39,119,0.45)] border border-pink-200/50 flex items-center justify-between">
-                <div className="flex items-center gap-3 pr-2">
-                  <span className="text-2xl">🌸</span>
-                  <div>
-                    <div className="font-sans font-black text-xs tracking-wide">{activeToast.title}</div>
-                    <div className="font-sans font-medium text-[11px] text-pink-50 mt-0.5 leading-snug">{activeToast.body}</div>
+            <div className="absolute top-3 sm:top-10 left-3 right-3 z-50 transition-all transform ease-out duration-300">
+              <div className="bg-gradient-to-r from-pink-600 via-pink-500 to-pink-600 text-white p-3.5 rounded-2xl shadow-[0_12px_28px_rgba(219,39,119,0.5)] border border-pink-200/60 flex items-center justify-between">
+                <div className="flex items-center gap-3 pr-2 min-w-0">
+                  <span className="text-2xl flex-shrink-0">🌸</span>
+                  <div className="min-w-0">
+                    <div className="font-sans font-black text-xs tracking-wide truncate">{activeToast.title}</div>
+                    <div className="font-sans font-medium text-[11px] text-pink-50 mt-0.5 leading-snug line-clamp-2">{activeToast.body}</div>
                   </div>
                 </div>
                 <button 
+                  type="button"
                   onClick={dismissToast}
-                  className="text-white/80 hover:text-white font-black text-xs px-2 py-1 bg-white/20 hover:bg-white/30 rounded-full cursor-pointer flex-shrink-0 border-none"
+                  className="text-white font-black text-xs px-2.5 py-1 bg-white/20 hover:bg-white/30 rounded-full cursor-pointer flex-shrink-0 border-none ml-2"
                 >
                   ✕
                 </button>

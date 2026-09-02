@@ -5,41 +5,42 @@ import { parseAppointmentTime, getOshawaTodayStr } from '../utils/dateUtils';
 // Soft, pleasant blossom chime for in-app and active tab alerts
 export const playAlertChime = () => {
   if (typeof window === 'undefined') return;
-  setTimeout(() => {
-    try {
-      const AudioCtx = window.AudioContext || window.webkitAudioContext;
-      if (!AudioCtx) return;
-      const ctx = new AudioCtx();
-      
-      const now = ctx.currentTime;
-      
-      // Note 1 (E5 - 659.25 Hz)
-      const osc1 = ctx.createOscillator();
-      const gain1 = ctx.createGain();
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(659.25, now);
-      gain1.gain.setValueAtTime(0.2, now);
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
-      osc1.connect(gain1);
-      gain1.connect(ctx.destination);
-      osc1.start(now);
-      osc1.stop(now + 0.45);
-
-      // Note 2 (B5 - 987.77 Hz)
-      const osc2 = ctx.createOscillator();
-      const gain2 = ctx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(987.77, now + 0.12);
-      gain2.gain.setValueAtTime(0.25, now + 0.12);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
-      osc2.connect(gain2);
-      gain2.connect(ctx.destination);
-      osc2.start(now + 0.12);
-      osc2.stop(now + 0.75);
-    } catch (e) {
-      // Audio context may be restricted before first interaction
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    const ctx = new AudioCtx();
+    if (ctx.state === 'suspended') {
+      ctx.resume();
     }
-  }, 0);
+    
+    const now = ctx.currentTime;
+    
+    // Note 1 (E5 - 659.25 Hz)
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sine';
+    osc1.frequency.setValueAtTime(659.25, now);
+    gain1.gain.setValueAtTime(0.2, now);
+    gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.45);
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.start(now);
+    osc1.stop(now + 0.45);
+
+    // Note 2 (B5 - 987.77 Hz)
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(987.77, now + 0.12);
+    gain2.gain.setValueAtTime(0.25, now + 0.12);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.75);
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.start(now + 0.12);
+    osc2.stop(now + 0.75);
+  } catch (e) {
+    // Audio context may be restricted before first interaction
+  }
 };
 
 // Trigger service worker reschedule
@@ -59,25 +60,33 @@ export const triggerDirectNotification = async (title, options = {}) => {
     return false;
   }
 
-  // 1. Trigger in-app dynamic toast popup
+  // 1. Trigger in-app dynamic toast popup immediately
   try {
     const store = useAppStore.getState();
     if (store && store.showToast) {
-      store.showToast({ title, body: options.body || '' });
+      store.showToast({ 
+        title, 
+        body: options.body || 'Blush appointment reminder',
+        id: Date.now()
+      });
     }
-  } catch (e) {}
+  } catch (e) {
+    console.warn('In-app toast failed:', e);
+  }
 
-  // 2. Play audio chime asynchronously
-  playAlertChime();
+  // 2. Play audio chime synchronously
+  try {
+    playAlertChime();
+  } catch (e) {}
 
   // 3. Trigger hardware vibration on mobile devices
   try {
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+    if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       navigator.vibrate([200, 100, 200]);
     }
   } catch (e) {}
 
-  // 4. If Notification API is available and permission is granted, display OS system notification
+  // 4. If Notification API is available and permission is granted, dispatch OS system notification
   if ('Notification' in window && Notification.permission === 'granted') {
     const notificationOptions = {
       icon: '/icon-192.png',
@@ -89,20 +98,23 @@ export const triggerDirectNotification = async (title, options = {}) => {
       ...options
     };
 
-    // Try Service Worker registration first (standard on Android/Chromium/PWA)
+    // A. Service Worker Registration with 1000ms safety timeout to prevent hanging
     if ('serviceWorker' in navigator) {
       try {
-        const reg = await navigator.serviceWorker.ready;
+        const swRegPromise = navigator.serviceWorker.ready;
+        const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1000));
+        const reg = await Promise.race([swRegPromise, timeoutPromise]);
+        
         if (reg && reg.showNotification) {
           await reg.showNotification(title, notificationOptions);
           return true;
         }
       } catch (err) {
-        console.warn('ServiceWorker ready showNotification failed, trying fallback:', err);
+        console.warn('SW showNotification error:', err);
       }
     }
 
-    // Try standard Notification constructor (desktop browsers)
+    // B. Direct browser Notification constructor fallback
     try {
       if (typeof Notification === 'function') {
         const notif = new Notification(title, notificationOptions);
@@ -113,7 +125,7 @@ export const triggerDirectNotification = async (title, options = {}) => {
         return true;
       }
     } catch (err2) {
-      console.warn('Direct Notification constructor failed:', err2);
+      console.warn('Direct Notification constructor fallback error:', err2);
     }
   }
 
