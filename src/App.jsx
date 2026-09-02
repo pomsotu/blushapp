@@ -53,6 +53,8 @@ const SettingsIco = ({ active }) => (
 export default function App() {
   const [currentView, setCurrentView] = useState('home');
   const [editingAppt, setEditingAppt] = useState(null);
+  const activeToast = useAppStore((state) => state.activeToast);
+  const dismissToast = useAppStore((state) => state.dismissToast);
 
   // Register PWA Service Worker & set up Live Notification Watcher
   useEffect(() => {
@@ -154,10 +156,31 @@ export default function App() {
         <div className="hidden sm:block absolute right-[-3px] top-[138px] width-[3px] h-[68px] bg-[#2C2C2E] rounded-r-md" />
 
         {/* Screen Area (Full screen on mobile, nested inside bezel on desktop) */}
-        <div className="absolute inset-0 sm:inset-3 bg-pink-soft/30 sm:rounded-[46px] overflow-hidden flex flex-col shadow-inner pt-2 sm:pt-8">
+        <div className="absolute inset-0 sm:inset-3 bg-pink-soft/30 sm:rounded-[46px] overflow-hidden flex flex-col shadow-inner pt-2 sm:pt-8 relative">
           
           {/* Desktop-only floating Dynamic Island bezel (Floats over the screen content on desktop only) */}
           <div className="hidden sm:block absolute left-1/2 top-[12px] -translate-x-1/2 w-[106px] h-[28px] bg-black rounded-[18px] z-30" />
+
+          {/* Floating In-App Heads-Up Notification Banner */}
+          {activeToast && (
+            <div className="absolute top-4 sm:top-10 left-3 right-3 z-50 animate-bounce">
+              <div className="bg-gradient-to-r from-pink-600 via-pink-500 to-pink-600 text-white p-3.5 rounded-2xl shadow-[0_12px_28px_rgba(219,39,119,0.45)] border border-pink-200/50 flex items-center justify-between">
+                <div className="flex items-center gap-3 pr-2">
+                  <span className="text-2xl">🌸</span>
+                  <div>
+                    <div className="font-sans font-black text-xs tracking-wide">{activeToast.title}</div>
+                    <div className="font-sans font-medium text-[11px] text-pink-50 mt-0.5 leading-snug">{activeToast.body}</div>
+                  </div>
+                </div>
+                <button 
+                  onClick={dismissToast}
+                  className="text-white/80 hover:text-white font-black text-xs px-2 py-1 bg-white/20 hover:bg-white/30 rounded-full cursor-pointer flex-shrink-0 border-none"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* View Container (Scrollable screen body) */}
           <div className="flex-1 overflow-y-auto no-scrollbar pb-6 bg-gradient-to-b from-pink-soft/20 via-[#FDF5FF] to-pink-soft/30">

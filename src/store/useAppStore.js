@@ -55,66 +55,69 @@ const notifyServiceWorker = (appt, settings) => {
 
 // Direct notification dispatcher with mobile & desktop compatibility
 export const triggerDirectNotification = async (title, options = {}) => {
-  if (typeof window === 'undefined' || !('Notification' in window)) {
+  if (typeof window === 'undefined') {
     return false;
   }
 
-  const notificationOptions = {
-    icon: '/icon.png',
-    badge: '/icon.png',
-    vibrate: [200, 100, 200],
-    ...options
-  };
+  // 1. Trigger in-app dynamic toast popup
+  try {
+    const store = useAppStore.getState();
+    if (store && store.showToast) {
+      store.showToast({ title, body: options.body || '' });
+    }
+  } catch (e) {}
 
-  // Play audio chime asynchronously
+  // 2. Play audio chime asynchronously
   playAlertChime();
 
-  if (Notification.permission !== 'granted') {
-    return false;
-  }
-
-  // 1. PostMessage to Service Worker controller if available
-  if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-    try {
-      navigator.serviceWorker.controller.postMessage({
-        type: 'SHOW_IMMEDIATE_NOTIFICATION',
-        title,
-        options: notificationOptions
-      });
-      return true;
-    } catch (e) {
-      console.warn('SW message dispatch failed:', e);
-    }
-  }
-
-  // 2. Direct browser Notification constructor (desktop Chrome, Firefox, Edge, Safari)
+  // 3. Trigger hardware vibration on mobile devices
   try {
-    if (typeof Notification === 'function') {
-      const notif = new Notification(title, notificationOptions);
-      notif.onclick = () => {
-        window.focus();
-        notif.close();
-      };
-      return true;
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      navigator.vibrate([200, 100, 200]);
     }
-  } catch (err) {
-    console.warn('Direct Notification constructor failed, trying SW registration:', err);
-  }
+  } catch (e) {}
 
-  // 3. Fallback via serviceWorker.getRegistration
-  try {
+  // 4. If Notification API is available and permission is granted, display OS system notification
+  if ('Notification' in window && Notification.permission === 'granted') {
+    const notificationOptions = {
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      vibrate: [200, 100, 200],
+      tag: options.tag || ('blush_' + Date.now()),
+      renotify: true,
+      requireInteraction: false,
+      ...options
+    };
+
+    // Try Service Worker registration first (standard on Android/Chromium/PWA)
     if ('serviceWorker' in navigator) {
-      const reg = await navigator.serviceWorker.getRegistration();
-      if (reg && reg.showNotification) {
-        await reg.showNotification(title, notificationOptions);
-        return true;
+      try {
+        const reg = await navigator.serviceWorker.ready;
+        if (reg && reg.showNotification) {
+          await reg.showNotification(title, notificationOptions);
+          return true;
+        }
+      } catch (err) {
+        console.warn('ServiceWorker ready showNotification failed, trying fallback:', err);
       }
     }
-  } catch (err2) {
-    console.warn('SW registration showNotification failed:', err2);
+
+    // Try standard Notification constructor (desktop browsers)
+    try {
+      if (typeof Notification === 'function') {
+        const notif = new Notification(title, notificationOptions);
+        notif.onclick = () => {
+          window.focus();
+          notif.close();
+        };
+        return true;
+      }
+    } catch (err2) {
+      console.warn('Direct Notification constructor failed:', err2);
+    }
   }
 
-  return false;
+  return true;
 };
 
 // Check if two time slots overlap
@@ -140,12 +143,24 @@ export const useAppStore = create(
     (set, get) => ({
       appointments: INITIAL_APPOINTMENTS,
       notifiedHistory: {},
+      activeToast: null,
       settings: {
         remind30m: true,       // 30 mins before appointment
         remind2hAfter: true,   // 2 hours after appointment (follow-up to mark completed/cancelled)
         remind24h: false,      // 24 hours before
         remind2h: false        // 2 hours before
       },
+
+      showToast: (toast) => {
+        set({ activeToast: toast });
+        setTimeout(() => {
+          if (get().activeToast === toast) {
+            set({ activeToast: null });
+          }
+        }, 6000);
+      },
+
+      dismissToast: () => set({ activeToast: null }),
 
       // Conflict Check helper
       checkConflict: (newAppt) => {
@@ -365,7 +380,12 @@ export const useAppStore = create(
       }
     }),
     {
-      name: 'blush_appointments'
+      name: 'blush_appointments',
+      partialize: (state) => ({
+        appointments: state.appointments,
+        settings: state.settings,
+        notifiedHistory: state.notifiedHistory
+      })
     }
   )
 );

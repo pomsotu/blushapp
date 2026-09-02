@@ -169,6 +169,12 @@ export default function SettingsView() {
                 {testAlertStatus}
               </div>
             )}
+
+            {typeof window !== 'undefined' && !window.isSecureContext && window.location.hostname !== 'localhost' && (
+              <div className="bg-amber-50 border border-amber-200/80 rounded-xl p-3 text-[11px] text-amber-900 font-medium leading-relaxed mt-1">
+                <span className="font-bold">📱 Android Testing Notice:</span> Android Chrome requires HTTPS for system lockscreen alerts. In-app popups and chimes work everywhere. Once hosted on Vercel with HTTPS, OS lockscreen alerts will appear automatically.
+              </div>
+            )}
           </div>
         </div>
 

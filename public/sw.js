@@ -1,4 +1,4 @@
-const CACHE_NAME = 'blush-cache-v3';
+const CACHE_NAME = 'blush-cache-v4';
 const ASSETS = [
   '/',
   '/index.html',
@@ -35,14 +35,13 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     caches.match(e.request).then((cachedResponse) => {
       if (cachedResponse) {
-        // Fetch fresh copy in background to update cache (stale-while-revalidate)
         fetch(e.request)
           .then((networkResponse) => {
             if (networkResponse.status === 200) {
               caches.open(CACHE_NAME).then((cache) => cache.put(e.request, networkResponse));
             }
           })
-          .catch(() => {/* Ignore network failures when offline */});
+          .catch(() => {});
         return cachedResponse;
       }
       
@@ -56,7 +55,6 @@ self.addEventListener('fetch', (e) => {
         });
         return networkResponse;
       }).catch(() => {
-        // Fallback for offline page assets
         return caches.match('/');
       });
     })
@@ -72,11 +70,15 @@ self.addEventListener('message', (event) => {
   // Immediate notification trigger (for in-app alerts and test notifications)
   if (data.type === 'SHOW_IMMEDIATE_NOTIFICATION') {
     const { title, options } = data;
-    self.registration.showNotification(title, {
-      icon: '/icon.png',
-      badge: '/icon.png',
+    const notifPromise = self.registration.showNotification(title, {
+      icon: '/icon-192.png',
+      badge: '/icon-192.png',
+      vibrate: [200, 100, 200],
       ...options
     });
+    if (event.waitUntil) {
+      event.waitUntil(notifPromise);
+    }
     return;
   }
 
