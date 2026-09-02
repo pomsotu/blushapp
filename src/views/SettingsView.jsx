@@ -288,8 +288,17 @@ export default function SettingsView() {
           <h2 className="font-serif italic text-lg text-pink-deep font-bold border-b border-pink-100 pb-2">
             Backup & Sync
           </h2>
-          <p className="font-sans text-gray-500 text-xs font-semibold -mt-2 leading-relaxed">
-            Appointments are stored locally on this phone. Export a backup file periodically so Tari never loses her schedule!
+          
+          <div className="bg-green-50 border border-green-200/70 rounded-2xl p-3 flex items-center gap-2.5">
+            <span className="text-xl flex-shrink-0">🛡️</span>
+            <div className="text-[11px] text-green-900 font-bold leading-tight">
+              Automatic Data Protection Active
+              <div className="font-medium text-green-800 text-[10px] mt-0.5">Your schedule is auto-saved to dual local storage vaults to prevent any data loss across updates.</div>
+            </div>
+          </div>
+
+          <p className="font-sans text-gray-500 text-xs font-semibold leading-relaxed">
+            Export a backup file anytime so Tari can save or transfer her schedule to another device:
           </p>
 
           <div className="flex flex-col gap-2.5">

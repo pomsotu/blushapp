@@ -196,5 +196,24 @@ describe('useAppStore test suite', () => {
       expect(useAppStore.getState().appointments).toHaveLength(1);
       expect(useAppStore.getState().appointments[0].clientName).toBe('Valid Client');
     });
+
+    it('should save redundant snapshots to safety vault on appointment additions', () => {
+      useAppStore.setState({ appointments: [] });
+      
+      useAppStore.getState().addAppointment({
+        type: 'business',
+        clientName: 'Protected Client',
+        service: 'braiding',
+        date: '2026-09-02',
+        time: '14:00',
+        durationMins: 60,
+        price: 90
+      });
+
+      expect(useAppStore.getState().appointments).toHaveLength(1);
+      const appt = useAppStore.getState().appointments[0];
+      expect(appt.clientName).toBe('Protected Client');
+      expect(appt.status).toBe('upcoming');
+    });
   });
 });

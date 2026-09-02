@@ -147,6 +147,30 @@ export const checkOverlap = (date1, time1, duration1, date2, time2, duration2) =
   return start1 < end2 && start2 < end1;
 };
 
+// Redundant Data Safety Vault Helper (Guarantees data preservation across updates)
+export const saveSafetyVault = (appointments) => {
+  if (typeof window === 'undefined' || !Array.isArray(appointments) || appointments.length === 0) return;
+  try {
+    const vault = {
+      timestamp: Date.now(),
+      dateSaved: new Date().toISOString(),
+      count: appointments.length,
+      appointments
+    };
+    localStorage.setItem('blush_safety_vault', JSON.stringify(vault));
+  } catch (e) {}
+};
+
+export const getSafetyVault = () => {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = localStorage.getItem('blush_safety_vault');
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+};
+
 // Empty database by default for production use
 const INITIAL_APPOINTMENTS = [];
 
@@ -213,45 +237,41 @@ export const useAppStore = create(
           // 1. Check 30-minute Pre-Appointment Reminder
           if (settings.remind30m) {
             const reminderTime = startTime - 30 * 60 * 1000;
-            const reminderKey = `30m_${appt.id}_${appt.date}_${appt.time}`;
+            const key = `30m_${appt.id}_${appt.date}_${appt.time}`;
 
-            // Trigger window: between 30m before and start time
-            if (now >= reminderTime && now < startTime && !updatedHistory[reminderKey]) {
-              const title = appt.type === 'business' 
-                ? 'Upcoming Booking in 30 Mins 💅' 
-                : 'Upcoming Schedule in 30 Mins 🌸';
-              const body = appt.type === 'business'
-                ? `Tari, your appointment with ${appt.clientName} starts in 30 mins!`
-                : `Tari, your event "${appt.title}" starts in 30 mins!`;
+            if (now >= reminderTime && now < startTime) {
+              if (!updatedHistory[key]) {
+                const title = appt.type === 'business' ? 'Upcoming Booking in 30 Mins 💅' : 'Upcoming Schedule in 30 Mins 🌸';
+                const body = appt.type === 'business'
+                  ? `Tari, your appointment with ${appt.clientName || 'your client'} starts in 30 mins!`
+                  : `Tari, your event "${appt.title || 'your schedule item'}" starts in 30 mins!`;
 
-              triggerDirectNotification(title, {
-                body,
-                tag: reminderKey
-              });
-
-              updatedHistory[reminderKey] = now;
-              historyChanged = true;
+                triggerDirectNotification(title, { body, tag: key });
+                updatedHistory[key] = now;
+                historyChanged = true;
+              }
             }
           }
 
           // 2. Check 2-hour Post-Appointment Follow-up Reminder
           if (settings.remind2hAfter) {
             const followupTime = endTime + 2 * 60 * 60 * 1000;
-            const followupKey = `2hAfter_${appt.id}_${appt.date}_${appt.time}`;
+            const followupWindowEnd = followupTime + 24 * 60 * 60 * 1000;
+            const key = `2hAfter_${appt.id}_${appt.date}_${appt.time}`;
 
-            // Trigger window: from 2 hours after end time up to 48 hours after
-            if (now >= followupTime && now <= (endTime + 48 * 60 * 60 * 1000) && !updatedHistory[followupKey]) {
+            // Trigger window: from 2 hours after end time up to 24 hours after
+            if (now >= followupTime && now <= followupWindowEnd && !updatedHistory[key]) {
               const title = 'Appointment Follow-up ✨';
               const body = appt.type === 'business'
-                ? `Did your appointment with ${appt.clientName} finish? Tap to mark it as completed or cancelled.`
-                : `Did your event "${appt.title}" finish? Tap to mark it as completed or cancelled.`;
+                ? `Did your appointment with ${appt.clientName || 'your client'} finish? Tap to mark it as completed or cancelled.`
+                : `Did your event "${appt.title || 'your event'}" finish? Tap to mark it as completed or cancelled.`;
 
               triggerDirectNotification(title, {
                 body,
-                tag: followupKey
+                tag: key
               });
 
-              updatedHistory[followupKey] = now;
+              updatedHistory[key] = now;
               historyChanged = true;
             }
           }
@@ -272,9 +292,11 @@ export const useAppStore = create(
           createdAt: new Date().toISOString()
         };
         
-        set((state) => ({
-          appointments: [...state.appointments, newAppt]
-        }));
+        set((state) => {
+          const updated = [...state.appointments, newAppt];
+          saveSafetyVault(updated);
+          return { appointments: updated };
+        });
 
         notifyServiceWorker(newAppt, get().settings);
         // Immediate check in case the appointment is scheduled within 30 minutes
@@ -287,6 +309,8 @@ export const useAppStore = create(
             a.id === id ? { ...a, ...updatedFields } : a
           );
           
+          saveSafetyVault(updatedAppts);
+
           const updatedAppt = updatedAppts.find((a) => a.id === id);
           if (updatedAppt) {
             notifyServiceWorker(updatedAppt, state.settings);
@@ -304,6 +328,8 @@ export const useAppStore = create(
             a.id === id ? { ...a, status: 'completed' } : a
           );
           
+          saveSafetyVault(updatedAppts);
+
           const completedAppt = updatedAppts.find((a) => a.id === id);
           if (completedAppt) {
             notifyServiceWorker({ ...completedAppt, status: 'completed' }, state.settings);
@@ -319,6 +345,8 @@ export const useAppStore = create(
             a.id === id ? { ...a, status: 'cancelled' } : a
           );
           
+          saveSafetyVault(updatedAppts);
+
           const cancelledAppt = updatedAppts.find((a) => a.id === id);
           if (cancelledAppt) {
             notifyServiceWorker({ ...cancelledAppt, status: 'cancelled' }, state.settings);
@@ -421,6 +449,7 @@ export const useAppStore = create(
           });
 
           set({ appointments: sanitizedAppts });
+          saveSafetyVault(sanitizedAppts);
           
           // Register reminders for all imported upcoming appointments
           const settings = get().settings;
@@ -444,11 +473,59 @@ export const useAppStore = create(
     }),
     {
       name: 'blush_appointments',
+      version: 2,
       partialize: (state) => ({
         appointments: state.appointments,
         settings: state.settings,
         notifiedHistory: state.notifiedHistory
-      })
+      }),
+      migrate: (persistedState) => {
+        if (!persistedState) return { appointments: [], settings: {}, notifiedHistory: {} };
+        
+        let appts = Array.isArray(persistedState.appointments) ? persistedState.appointments : [];
+        
+        // If current state is empty, check and recover from safety vault
+        if (appts.length === 0) {
+          const vault = getSafetyVault();
+          if (vault && Array.isArray(vault.appointments) && vault.appointments.length > 0) {
+            appts = vault.appointments;
+          }
+        }
+
+        // Migrate and guarantee complete field integrity
+        const migratedAppts = appts.map((appt) => {
+          if (!appt || typeof appt !== 'object') return null;
+          return {
+            id: appt.id || crypto.randomUUID(),
+            type: appt.type === 'personal' ? 'personal' : 'business',
+            status: ['upcoming', 'completed', 'cancelled'].includes(appt.status) ? appt.status : 'upcoming',
+            clientName: appt.clientName || (appt.type === 'business' ? 'Client' : undefined),
+            title: appt.title || (appt.type === 'personal' ? 'Personal Schedule' : undefined),
+            service: appt.service || (appt.type === 'business' ? 'braiding' : undefined),
+            durationMins: typeof appt.durationMins === 'number' ? appt.durationMins : 60,
+            price: typeof appt.price === 'number' ? appt.price : (appt.price ? Number(appt.price) : null),
+            date: appt.date || getOshawaTodayStr(),
+            time: appt.time || '12:00',
+            notes: appt.notes || null,
+            createdAt: appt.createdAt || new Date().toISOString()
+          };
+        }).filter(Boolean);
+
+        saveSafetyVault(migratedAppts);
+
+        return {
+          ...persistedState,
+          appointments: migratedAppts,
+          settings: {
+            remind30m: true,
+            remind2hAfter: true,
+            remind24h: false,
+            remind2h: false,
+            ...(persistedState.settings || {})
+          },
+          notifiedHistory: persistedState.notifiedHistory || {}
+        };
+      }
     }
   )
 );
