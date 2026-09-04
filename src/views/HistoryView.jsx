@@ -22,7 +22,11 @@ export default function HistoryView() {
   const pastAppts = appointments
     .filter((a) => a.status !== 'upcoming')
     .filter((a) => filter === 'all' || a.type === filter)
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .sort((a, b) => {
+      const dateCmp = b.date.localeCompare(a.date);
+      if (dateCmp !== 0) return dateCmp;
+      return (b.time || '').localeCompare(a.time || '');
+    });
 
   // Compute completed count and total earnings
   const completedAppts = appointments.filter((a) => a.status === 'completed');

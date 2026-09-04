@@ -8,9 +8,6 @@ import AddView from './views/AddView';
 import HistoryView from './views/HistoryView';
 import SettingsView from './views/SettingsView';
 
-// Components
-import ApptCard from './components/ApptCard';
-
 // Navigation SVG Icons
 const HomeIco = ({ active }) => (
   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={active ? "2.5" : "2"} strokeLinecap="round" strokeLinejoin="round">
@@ -129,7 +126,7 @@ export default function App() {
       case 'settings':
         return <SettingsView />;
       default:
-        return <HomeView onEditAppt={handleEditAppt} onAddAppt={handleAddNewAppt} />;
+        return <HomeView onEditAppt={handleEditAppt} />;
     }
   };
 

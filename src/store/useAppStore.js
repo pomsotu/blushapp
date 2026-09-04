@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { parseAppointmentTime, getOshawaTodayStr } from '../utils/dateUtils';
+import { syncRemindersWithServer, sendServerTestPush } from '../utils/pushManager';
 
 // Soft, pleasant blossom chime for in-app and active tab alerts
 export const playAlertChime = () => {
@@ -38,7 +39,7 @@ export const playAlertChime = () => {
     gain2.connect(ctx.destination);
     osc2.start(now + 0.12);
     osc2.stop(now + 0.75);
-  } catch (e) {
+  } catch {
     // Audio context may be restricted before first interaction
   }
 };
@@ -70,21 +71,21 @@ export const triggerDirectNotification = async (title, options = {}) => {
         id: Date.now()
       });
     }
-  } catch (e) {
-    console.warn('In-app toast failed:', e);
+  } catch {
+    // In-app toast fallback
   }
 
   // 2. Play audio chime synchronously
   try {
     playAlertChime();
-  } catch (e) {}
+  } catch {}
 
   // 3. Trigger hardware vibration on mobile devices
   try {
     if (typeof navigator !== 'undefined' && typeof navigator.vibrate === 'function') {
       navigator.vibrate([200, 100, 200]);
     }
-  } catch (e) {}
+  } catch {}
 
   // 4. If Notification API is available and permission is granted, dispatch OS system notification
   if ('Notification' in window && Notification.permission === 'granted') {
@@ -158,7 +159,7 @@ export const saveSafetyVault = (appointments) => {
       appointments
     };
     localStorage.setItem('blush_safety_vault', JSON.stringify(vault));
-  } catch (e) {}
+  } catch {}
 };
 
 export const getSafetyVault = () => {
@@ -166,7 +167,7 @@ export const getSafetyVault = () => {
   try {
     const raw = localStorage.getItem('blush_safety_vault');
     return raw ? JSON.parse(raw) : null;
-  } catch (e) {
+  } catch {
     return null;
   }
 };
@@ -299,6 +300,7 @@ export const useAppStore = create(
         });
 
         notifyServiceWorker(newAppt, get().settings);
+        syncRemindersWithServer(get().appointments, get().settings);
         // Immediate check in case the appointment is scheduled within 30 minutes
         get().checkPendingNotifications();
       },
@@ -315,6 +317,7 @@ export const useAppStore = create(
           if (updatedAppt) {
             notifyServiceWorker(updatedAppt, state.settings);
           }
+          syncRemindersWithServer(updatedAppts, state.settings);
           
           return { appointments: updatedAppts };
         });
@@ -334,6 +337,7 @@ export const useAppStore = create(
           if (completedAppt) {
             notifyServiceWorker({ ...completedAppt, status: 'completed' }, state.settings);
           }
+          syncRemindersWithServer(updatedAppts, state.settings);
 
           return { appointments: updatedAppts };
         });
@@ -351,6 +355,7 @@ export const useAppStore = create(
           if (cancelledAppt) {
             notifyServiceWorker({ ...cancelledAppt, status: 'cancelled' }, state.settings);
           }
+          syncRemindersWithServer(updatedAppts, state.settings);
 
           return { appointments: updatedAppts };
         });
@@ -366,6 +371,7 @@ export const useAppStore = create(
               notifyServiceWorker(appt, mergedSettings);
             }
           });
+          syncRemindersWithServer(state.appointments, mergedSettings);
 
           return { settings: mergedSettings };
         });
@@ -374,6 +380,7 @@ export const useAppStore = create(
       },
 
       sendTestNotification: () => {
+        sendServerTestPush().catch(() => {});
         return triggerDirectNotification('Blush Alerts Active 🌸', {
           body: 'Your appointment reminders and post-appointment follow-up alerts are working perfectly!',
           tag: 'test_alert_' + Date.now()
@@ -458,6 +465,7 @@ export const useAppStore = create(
               notifyServiceWorker(appt, settings);
             }
           });
+          syncRemindersWithServer(sanitizedAppts, settings);
 
           get().checkPendingNotifications();
 

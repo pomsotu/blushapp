@@ -1,6 +1,7 @@
 import React, { useRef, useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { getOshawaTodayStr } from '../utils/dateUtils';
+import { registerPushSubscription } from '../utils/pushManager';
 
 export default function SettingsView() {
   const settings = useAppStore((state) => state.settings);
@@ -24,6 +25,9 @@ export default function SettingsView() {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setPermission(Notification.permission);
+      if (Notification.permission === 'granted') {
+        registerPushSubscription().catch(() => {});
+      }
     }
   }, []);
 
@@ -50,11 +54,15 @@ export default function SettingsView() {
       }
       setPermission(res);
 
+      if (res === 'granted') {
+        await registerPushSubscription().catch(() => {});
+      }
+
       // ALWAYS trigger test alert so Tari gets instant visual, sound, and haptic feedback
       await sendTestNotification();
 
       if (res === 'granted') {
-        setTestAlertStatus('Notifications active! Sent test alert 🌸');
+        setTestAlertStatus('Background alerts active! Sent test alert 🌸');
       } else if (res === 'denied') {
         setTestAlertStatus('In-app alert fired 🌸 (System alerts blocked in browser settings)');
       } else {
@@ -80,7 +88,7 @@ export default function SettingsView() {
           res = await new Promise((resolve) => Notification.requestPermission(resolve));
         }
         setPermission(res);
-      } catch (e) {}
+      } catch {}
     }
 
     // ALWAYS dispatch test notification immediately
@@ -119,7 +127,7 @@ export default function SettingsView() {
       
       setExportStatus('Backup downloaded! 🌸');
       setTimeout(() => setExportStatus(''), 3000);
-    } catch (e) {
+    } catch {
       setExportStatus('Export failed ❌');
       setTimeout(() => setExportStatus(''), 3000);
     }
@@ -213,6 +221,12 @@ export default function SettingsView() {
             {permission === 'denied' && (
               <div className="bg-red-50 border border-red-200/80 rounded-xl p-3 text-[11px] text-red-900 font-medium leading-relaxed mt-1">
                 <span className="font-bold">⚠️ Alerts blocked in browser:</span> Tap the tune/lock icon in your address bar → Permissions → Notifications → tap <b>Allow</b>, then tap Send Test Notification.
+              </div>
+            )}
+
+            {typeof window !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.matchMedia('(display-mode: standalone)').matches && !navigator.standalone && (
+              <div className="bg-blue-50 border border-blue-200/80 rounded-xl p-3 text-[11px] text-blue-950 font-medium leading-relaxed mt-1">
+                <span className="font-bold">📲 iPhone / iPad Setup (iOS 16.4+):</span> To receive lockscreen alerts when the app is closed on iOS, tap the Safari <b>Share (↑)</b> button below → select <b>Add to Home Screen</b>, then launch Blush from your home screen.
               </div>
             )}
 

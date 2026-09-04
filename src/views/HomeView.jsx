@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import ApptCard from '../components/ApptCard';
 import { getOshawaTodayStr, parseAppointmentTime, TIMEZONE } from '../utils/dateUtils';
+import { registerPushSubscription } from '../utils/pushManager';
 
-export default function HomeView({ onEditAppt, onAddAppt }) {
+export default function HomeView({ onEditAppt }) {
   const appointments = useAppStore((state) => state.appointments);
   const completeAppointment = useAppStore((state) => state.completeAppointment);
   const cancelAppointment = useAppStore((state) => state.cancelAppointment);
@@ -17,6 +18,9 @@ export default function HomeView({ onEditAppt, onAddAppt }) {
   useEffect(() => {
     if (typeof window !== 'undefined' && 'Notification' in window) {
       setNotificationPermission(Notification.permission);
+      if (Notification.permission === 'granted') {
+        registerPushSubscription().catch(() => {});
+      }
     }
   }, []);
 
@@ -33,7 +37,10 @@ export default function HomeView({ onEditAppt, onAddAppt }) {
           }
         }
         setNotificationPermission(res);
-      } catch (e) {}
+        if (res === 'granted') {
+          await registerPushSubscription().catch(() => {});
+        }
+      } catch {}
     }
     await sendTestNotification();
   };

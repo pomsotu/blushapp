@@ -1,4 +1,4 @@
-const CACHE_NAME = 'blush-cache-v4';
+const CACHE_NAME = 'blush-cache-v5';
 const ASSETS = [
   '/',
   '/index.html',
@@ -8,6 +8,38 @@ const ASSETS = [
   '/icon-192.png',
   '/icon-512.png'
 ];
+
+// Web Push event - handles background push from FCM/APNs when PWA is completely closed
+self.addEventListener('push', (event) => {
+  let data = {
+    title: 'Blush 🌸',
+    body: 'You have an upcoming appointment reminder!'
+  };
+
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch {
+      data = { title: 'Blush 🌸', body: event.data ? event.data.text() : '' };
+    }
+  }
+
+  const options = {
+    body: data.body || 'You have an upcoming appointment reminder!',
+    icon: '/icon-192.png',
+    badge: '/icon-192.png',
+    vibrate: [200, 100, 200],
+    tag: data.tag || 'blush-push-' + Date.now(),
+    renotify: true,
+    data: {
+      url: data.url || '/'
+    }
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'Blush 🌸', options)
+  );
+});
 
 // Active background timeout pool for Safari/iOS fallback
 const activeTimeouts = new Map();

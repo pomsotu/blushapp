@@ -20,7 +20,7 @@ const serviceLabels = {
   both: 'Hair & Nails ✨'
 };
 
-export default function ApptCard({ appt, compact = false, showDate = false, onClick }) {
+export default function ApptCard({ appt, showDate = false, onClick }) {
   const isPersonal = appt.type === 'personal';
   const accentColor = isPersonal ? 'text-violet-600' : 'text-pink-deep';
   const bgClass = isPersonal ? 'bg-lavender-soft/80' : 'bg-pink-soft/60';

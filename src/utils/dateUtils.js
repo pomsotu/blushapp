@@ -31,7 +31,7 @@ export const parseAppointmentTime = (dateStr, timeStr) => {
     const offsetHours = offsetMatch ? Number(offsetMatch[1]) : -4;
     const offsetStr = (offsetHours <= 0 ? '-' : '+') + pad(Math.abs(offsetHours)) + ':00';
     return new Date(`${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00${offsetStr}`).getTime();
-  } catch (e) {
+  } catch {
     return new Date(year, month - 1, day, hour, minute, 0, 0).getTime();
   }
 };
