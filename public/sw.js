@@ -1,4 +1,4 @@
-const CACHE_NAME = 'blush-cache-v5';
+const CACHE_NAME = 'blush-cache-v6';
 const ASSETS = [
   '/',
   '/index.html',
@@ -54,40 +54,67 @@ self.addEventListener('install', (e) => {
   self.skipWaiting();
 });
 
-// Activate event
+// Activate event - delete all older cache versions to prevent stale chunk crashes
 self.addEventListener('activate', (e) => {
-  e.waitUntil(self.clients.claim());
+  e.waitUntil(
+    caches.keys().then((cacheNames) => {
+      return Promise.all(
+        cacheNames.map((cacheName) => {
+          if (cacheName !== CACHE_NAME) {
+            console.log('[SW] Purging legacy cache:', cacheName);
+            return caches.delete(cacheName);
+          }
+        })
+      );
+    }).then(() => self.clients.claim())
+  );
 });
 
-// Fetch event - cache first, fallback to network
+// Fetch event - Network-First for Navigation, Stale-While-Revalidate for Assets
 self.addEventListener('fetch', (e) => {
-  // Only cache GET requests
   if (e.request.method !== 'GET') return;
-  
+
+  const url = new URL(e.request.url);
+
+  // Bypass service worker caching for API calls
+  if (url.pathname.startsWith('/api/')) {
+    return;
+  }
+
+  // 1. Navigation / Document requests: Network-First strategy
+  if (e.request.mode === 'navigate' || e.request.destination === 'document') {
+    e.respondWith(
+      fetch(e.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200) {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
+          }
+          return networkResponse;
+        })
+        .catch(() => {
+          return caches.match('/') || caches.match('/index.html');
+        })
+    );
+    return;
+  }
+
+  // 2. Static Assets: Stale-While-Revalidate without fallback to HTML
   e.respondWith(
     caches.match(e.request).then((cachedResponse) => {
-      if (cachedResponse) {
-        fetch(e.request)
-          .then((networkResponse) => {
-            if (networkResponse.status === 200) {
-              caches.open(CACHE_NAME).then((cache) => cache.put(e.request, networkResponse));
-            }
-          })
-          .catch(() => {});
-        return cachedResponse;
-      }
-      
-      return fetch(e.request).then((networkResponse) => {
-        if (!networkResponse || networkResponse.status !== 200 || networkResponse.type !== 'basic') {
+      const fetchPromise = fetch(e.request)
+        .then((networkResponse) => {
+          if (networkResponse && networkResponse.status === 200 && networkResponse.type === 'basic') {
+            const copy = networkResponse.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(e.request, copy));
+          }
           return networkResponse;
-        }
-        const responseToCache = networkResponse.clone();
-        caches.open(CACHE_NAME).then((cache) => {
-          cache.put(e.request, responseToCache);
-        });
-        return networkResponse;
-      }).catch(() => {
-        return caches.match('/');
+        })
+        .catch(() => null);
+
+      return cachedResponse || fetchPromise.then((res) => {
+        if (res) return res;
+        return new Response('Asset not found', { status: 404, headers: { 'Content-Type': 'text/plain' } });
       });
     })
   );

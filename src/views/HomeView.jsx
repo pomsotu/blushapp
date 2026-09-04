@@ -93,20 +93,20 @@ export default function HomeView({ onEditAppt }) {
     <div className="flex flex-col min-h-full">
       
       {/* Header Container */}
-      <div className="bg-gradient-to-r from-pink-soft via-pink-primary to-pink-deep pt-6 pb-8 px-6 text-white shadow-md relative overflow-hidden">
+      <div className="bg-gradient-to-br from-pink-primary via-[#EC4899] to-pink-deep pt-7 pb-8 px-6 text-white shadow-[0_8px_25px_rgba(219,39,119,0.18)] rounded-b-[28px] relative overflow-hidden flex-shrink-0">
         {/* Subtle decorative blossom overlays */}
-        <div className="absolute right-[-20px] top-[-10px] text-white/10 text-9xl font-black pointer-events-none select-none">🌸</div>
-        <div className="absolute left-[-30px] bottom-[-40px] text-white/5 text-9xl font-black pointer-events-none select-none">💅</div>
+        <div className="absolute right-[-15px] top-[-10px] text-white/10 text-8xl font-black pointer-events-none select-none">🌸</div>
+        <div className="absolute left-[-25px] bottom-[-30px] text-white/5 text-8xl font-black pointer-events-none select-none">💅</div>
 
-        <div className="font-sans text-[11px] font-black uppercase tracking-wider text-pink-50">
+        <div className="font-sans text-[11px] font-black uppercase tracking-wider text-pink-100/90">
           {dayName}, {dateName}
         </div>
-        <h1 className="font-serif italic text-[32px] font-extrabold mt-1 tracking-wide drop-shadow-sm">
+        <h1 className="font-serif italic text-[30px] font-black mt-0.5 tracking-wide drop-shadow-sm text-white">
           Hey Tari 🌸
         </h1>
         
         {/* Statistics Cards Row */}
-        <div className="flex gap-3 mt-6">
+        <div className="flex gap-3 mt-5">
           
           {/* Card 1: Bookings */}
           <div className="glass-card rounded-2xl p-4 flex-1 flex flex-col justify-between">

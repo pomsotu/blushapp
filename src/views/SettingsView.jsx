@@ -166,9 +166,9 @@ export default function SettingsView() {
     <div className="flex flex-col min-h-full">
       
       {/* Header Container */}
-      <div className="bg-gradient-to-r from-pink-soft via-pink-primary to-pink-deep pt-6 pb-6 px-6 text-white shadow-md flex-shrink-0">
-        <h1 className="font-serif italic text-[24px] font-extrabold tracking-wide drop-shadow-sm">
-          Settings
+      <div className="bg-gradient-to-br from-pink-primary via-[#EC4899] to-pink-deep pt-7 pb-6 px-6 text-white shadow-[0_8px_25px_rgba(219,39,119,0.18)] rounded-b-[28px] mb-2 flex-shrink-0">
+        <h1 className="font-serif italic text-[26px] font-black tracking-wide drop-shadow-sm text-white">
+          Settings ⚙️
         </h1>
       </div>
 
