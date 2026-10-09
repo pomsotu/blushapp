@@ -91,5 +91,7 @@ export const scopeSummary = (appt) =>
 
 export const formatMoney = (amount) => {
   if (typeof amount !== 'number' || !Number.isFinite(amount)) return '$0';
-  return Number.isInteger(amount) ? `$${amount}` : `$${amount.toFixed(2)}`;
+  return Number.isInteger(amount)
+    ? `$${amount.toLocaleString('en-US')}`
+    : `$${amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 };

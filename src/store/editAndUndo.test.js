@@ -100,6 +100,8 @@ describe('itemized services and editing scope/price', () => {
     expect(formatMoney(160)).toBe('$160');
     expect(formatMoney(160.5)).toBe('$160.50');
     expect(formatMoney(null)).toBe('$0');
+    expect(formatMoney(2165)).toBe('$2,165');
+    expect(formatMoney(1234.5)).toBe('$1,234.50');
   });
 });
 

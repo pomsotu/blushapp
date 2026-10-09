@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { scopeSummary, formatMoney } from '../utils/services';
+import ReportSheet from '../components/ReportSheet';
 
 const formatTime = (timeStr) => {
   const [h, m] = timeStr.split(':').map(Number);
@@ -12,6 +13,7 @@ const formatTime = (timeStr) => {
 export default function HistoryView({ onEditAppt }) {
   const appointments = useAppStore((state) => state.appointments);
   const [filter, setFilter] = useState('all');
+  const [showReports, setShowReports] = useState(false);
 
   // Filter history (completed or cancelled)
   const pastAppts = appointments
@@ -36,9 +38,23 @@ export default function HistoryView({ onEditAppt }) {
       
       {/* Header Container */}
       <div className="bg-gradient-to-br from-pink-primary via-[#EC4899] to-pink-deep pt-7 pb-8 px-6 text-white shadow-[0_8px_25px_rgba(219,39,119,0.18)] rounded-b-[28px] mb-2 flex-shrink-0">
-        <h1 className="font-serif italic text-[26px] font-black tracking-wide drop-shadow-sm mb-4 text-white">
-          History ✨
-        </h1>
+        <div className="flex items-center justify-between mb-4 gap-3">
+          <h1 className="font-serif italic text-[26px] font-black tracking-wide drop-shadow-sm text-white">
+            History ✨
+          </h1>
+          <button
+            type="button"
+            data-testid="open-reports"
+            onClick={() => setShowReports(true)}
+            className="flex items-center gap-1.5 bg-white text-pink-deep rounded-xl px-3.5 py-2 text-xs font-black border-none cursor-pointer shadow-[0_4px_14px_rgba(131,24,67,0.18)] hover:bg-pink-50 active:scale-95 transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z" />
+              <path d="M14 3v5h5M9 17v-3M12 17v-6M15 17v-2" />
+            </svg>
+            Reports
+          </button>
+        </div>
 
         {/* Stats Row */}
         <div className="flex gap-3">
@@ -159,6 +175,7 @@ export default function HistoryView({ onEditAppt }) {
         )}
 
       </div>
+      <ReportSheet isOpen={showReports} onClose={() => setShowReports(false)} />
     </div>
   );
 }
