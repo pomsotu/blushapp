@@ -91,7 +91,7 @@ export function syncReminders(subscription, appointments, settings) {
       const offsetStr = (offsetHours <= 0 ? '-' : '+') + pad(Math.abs(offsetHours)) + ':00';
       const startTime = new Date(`${year}-${pad(month)}-${pad(day)}T${pad(hour)}:${pad(minute)}:00${offsetStr}`).getTime();
 
-      const durationMins = appt.type === 'business' ? (appt.durationMins || 60) : 60;
+      const durationMins = appt.durationMins > 0 ? appt.durationMins : 60;
       const endTime = startTime + durationMins * 60 * 1000;
 
       if (settings?.remind30m) {

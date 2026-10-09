@@ -1,4 +1,6 @@
 import React from 'react';
+import { scopeSummary, formatMoney } from '../utils/services';
+import { getDurationMins, endTimeOf } from '../utils/schedule';
 
 const formatTime = (timeStr) => {
   const [h, m] = timeStr.split(':').map(Number);
@@ -12,12 +14,6 @@ const formatDuration = (mins) => {
   const hrs = Math.floor(mins / 60);
   const rMins = mins % 60;
   return rMins ? `${hrs}h ${rMins}m` : `${hrs}h`;
-};
-
-const serviceLabels = {
-  braiding: 'Hair Braiding 🌀',
-  nails: 'Nail Art 💅',
-  both: 'Hair & Nails ✨'
 };
 
 export default function ApptCard({ appt, showDate = false, onClick }) {
@@ -44,6 +40,9 @@ export default function ApptCard({ appt, showDate = false, onClick }) {
         <div className={`font-sans text-[11px] font-black tracking-wide ${accentColor}`}>
           {formatTime(appt.time)}
         </div>
+        <div className="font-sans text-[9.5px] font-bold text-gray-500 tabular-nums">
+          to {formatTime(endTimeOf(appt.time, getDurationMins(appt)))}
+        </div>
       </div>
 
       {/* Details */}
@@ -56,13 +55,13 @@ export default function ApptCard({ appt, showDate = false, onClick }) {
         <div className="font-sans font-bold text-gray-800 text-[14px] leading-tight truncate">
           {isPersonal ? appt.title : appt.clientName}
         </div>
-        <div className="font-sans text-[11px] text-gray-500 mt-0.5 font-bold flex items-center gap-1">
+        <div className="font-sans text-[11px] text-gray-500 mt-0.5 font-bold flex items-center gap-1 min-w-0">
           {isPersonal ? (
-            <span>Personal 🌸</span>
+            <span>Personal 🌸 · {formatDuration(getDurationMins(appt))}</span>
           ) : (
-            <span>
-              {serviceLabels[appt.service] || appt.service}
-              {appt.durationMins ? ` · ${formatDuration(appt.durationMins)}` : ''}
+            <span className="truncate">
+              {scopeSummary(appt) || 'No services added'}
+              {` · ${formatDuration(getDurationMins(appt))}`}
             </span>
           )}
         </div>
@@ -72,7 +71,7 @@ export default function ApptCard({ appt, showDate = false, onClick }) {
       <div className="text-right flex-shrink-0 flex flex-col items-end gap-1">
         {appt.price != null && !isPersonal && (
           <div className="font-sans font-extrabold text-[14px] text-pink-deep">
-            ${appt.price}
+            {formatMoney(appt.price)}
           </div>
         )}
         

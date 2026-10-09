@@ -49,7 +49,9 @@ export default function CalendarGrid({ selectedDate, onSelectDay }) {
       {/* Month Navigation */}
       <div className="flex items-center justify-between mb-4">
         <button
+          type="button"
           onClick={prevMonth}
+          aria-label="Previous month"
           className="w-9 h-9 rounded-xl bg-pink-soft/50 text-pink-deep hover:bg-pink-soft font-black text-[16px] transition-all flex items-center justify-center border border-white"
         >
           ‹
@@ -58,7 +60,9 @@ export default function CalendarGrid({ selectedDate, onSelectDay }) {
           {MONTHS[viewMonth]} {viewYear}
         </div>
         <button
+          type="button"
           onClick={nextMonth}
+          aria-label="Next month"
           className="w-9 h-9 rounded-xl bg-pink-soft/50 text-pink-deep hover:bg-pink-soft font-black text-[16px] transition-all flex items-center justify-center border border-white"
         >
           ›

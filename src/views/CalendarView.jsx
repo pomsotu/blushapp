@@ -1,24 +1,27 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import CalendarGrid from '../components/CalendarGrid';
-import ApptCard from '../components/ApptCard';
+import DayTimeline from '../components/DayTimeline';
 import { getOshawaTodayStr, TIMEZONE } from '../utils/dateUtils';
+import { getDurationMins, formatDurationLabel } from '../utils/schedule';
 
-export default function CalendarView({ onEditAppt }) {
+export default function CalendarView({ onEditAppt, onAddAt, selectedDate: controlledDate, onSelectDate }) {
   const appointments = useAppStore((state) => state.appointments);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  // The selected day lives in App so it survives opening a booking and coming back
+  const [localDate, setLocalDate] = useState(new Date());
+  const selectedDate = controlledDate || localDate;
+  const setSelectedDate = onSelectDate || setLocalDate;
 
   const selectedDateStr = getOshawaTodayStr(selectedDate);
   const todayStr = getOshawaTodayStr(new Date());
 
-  // Filter appointments for the selected day
-  const dayAppointments = appointments
-    .filter((a) => a.date === selectedDateStr && a.status === 'upcoming')
-    .sort((a, b) => a.time.localeCompare(b.time));
+  // Upcoming bookings for the selected day (for the summary line)
+  const dayAppointments = appointments.filter(
+    (a) => a.date === selectedDateStr && a.status === 'upcoming'
+  );
+  const bookedMins = dayAppointments.reduce((sum, a) => sum + getDurationMins(a), 0);
 
-  // Determine date label
   const isSelectedToday = selectedDateStr === todayStr;
-  
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
   const isSelectedTomorrow = selectedDateStr === getOshawaTodayStr(tomorrow);
@@ -43,9 +46,7 @@ export default function CalendarView({ onEditAppt }) {
         </h1>
       </div>
 
-      {/* Grid wrapper */}
-      <div className="px-5 flex flex-col gap-4">
-        {/* Render calendar grid component */}
+      <div className="px-5 flex flex-col gap-4 pb-10">
         <CalendarGrid selectedDate={selectedDate} onSelectDay={setSelectedDate} />
 
         {/* Legend */}
@@ -60,29 +61,28 @@ export default function CalendarView({ onEditAppt }) {
           </div>
         </div>
 
-        {/* Day Detail divider */}
         <hr className="border-pink-100/60 my-1" />
 
-        {/* List for selected day */}
+        {/* Selected day */}
         <div className="flex flex-col gap-3">
-          <div className="font-sans text-[11px] font-black text-pink-deep/75 uppercase tracking-widest px-1">
-            {dateLabel}
+          <div className="flex items-baseline justify-between px-1">
+            <h2 className="font-sans text-[11px] font-black text-pink-deep/75 uppercase tracking-widest">
+              {dateLabel}
+            </h2>
+            <span className="font-sans text-[11px] font-bold text-gray-500" data-testid="day-summary">
+              {dayAppointments.length === 0
+                ? 'Open all day · tap a time to book'
+                : `${dayAppointments.length} booked · ${formatDurationLabel(bookedMins)}`}
+            </span>
           </div>
 
-          {dayAppointments.length === 0 ? (
-            <div className="bg-white rounded-2xl p-6 text-center shadow-[0_4px_16px_rgba(244,114,182,0.03)] border border-pink-100/50">
-              <div className="text-2xl mb-1">🌸</div>
-              <div className="font-sans text-xs text-gray-500 font-bold leading-normal">
-                Nothing scheduled for this day. Free time! ✨
-              </div>
-            </div>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {dayAppointments.map((appt) => (
-                <ApptCard key={appt.id} appt={appt} onClick={() => onEditAppt(appt)} />
-              ))}
-            </div>
-          )}
+          <DayTimeline
+            date={selectedDateStr}
+            isToday={isSelectedToday}
+            appointments={appointments}
+            onOpen={onEditAppt}
+            onAddAt={(time) => onAddAt(selectedDateStr, time)}
+          />
         </div>
       </div>
     </div>

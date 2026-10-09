@@ -1,125 +1,251 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import ConflictModal from '../components/ConflictModal';
-import { getOshawaTodayStr } from '../utils/dateUtils';
+import PriceListSheet from '../components/PriceListSheet';
+import ServiceLine from '../components/ServiceLine';
+import { findOption, optionLine } from '../data/priceList';
+import { getOshawaTodayStr, formatTime } from '../utils/dateUtils';
+import {
+  SERVICE_KINDS,
+  MAX_ITEMS,
+  newItemId,
+  getServiceItems,
+  formatMoney
+} from '../utils/services';
+import {
+  DURATION_OPTIONS,
+  formatDurationLabel,
+  formatTimeRange,
+  findConflict,
+  findNextFreeStart,
+  getDurationMins
+} from '../utils/schedule';
 
-const durationOptions = [
-  { label: '1 hr', value: 60 },
-  { label: '1.5 hr', value: 90 },
-  { label: '2 hr', value: 120 },
-  { label: '2.5 hr', value: 150 },
-  { label: '3 hr', value: 180 },
-  { label: '3.5 hr', value: 210 },
-  { label: '4 hr+', value: 240 }
-];
+const blankItem = (kind = 'hair') => ({ id: newItemId(), kind, name: '', price: '' });
 
-export default function AddView({ editAppt, onSave, onCancel }) {
+const toFormItems = (appt) =>
+  getServiceItems(appt).map((i) => ({
+    id: i.id,
+    kind: i.kind,
+    name: i.name,
+    price: typeof i.price === 'number' ? String(i.price) : '',
+    catalog: i.catalog,
+    qty: i.qty
+  }));
+
+const parsePrice = (value) => {
+  if (value === '' || value === null || value === undefined) return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+};
+
+const statusCopy = {
+  completed: {
+    title: 'Completed',
+    body: 'You can still change the services and prices. Your earnings in History update to match.',
+    action: 'Move back to upcoming'
+  },
+  cancelled: {
+    title: 'Cancelled',
+    body: 'This booking is in History as cancelled.',
+    action: 'Restore booking'
+  }
+};
+
+const labelClass = 'font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider';
+const fieldClass =
+  'w-full bg-white border border-pink-100 rounded-xl p-3 text-sm font-semibold outline-none focus:border-pink-primary transition-all text-gray-700 shadow-sm';
+
+const whoOf = (appt) => (appt.type === 'business' ? appt.clientName : appt.title);
+
+export default function AddView({ editAppt, prefill, onSave, onCancel }) {
   const addAppointment = useAppStore((state) => state.addAppointment);
   const updateAppointment = useAppStore((state) => state.updateAppointment);
   const completeAppointment = useAppStore((state) => state.completeAppointment);
   const cancelAppointment = useAppStore((state) => state.cancelAppointment);
-  const checkConflict = useAppStore((state) => state.checkConflict);
+  const reopenAppointment = useAppStore((state) => state.reopenAppointment);
+  const appointments = useAppStore((state) => state.appointments);
 
   const isEditing = !!editAppt;
+  // Read the live status so "Move back to upcoming" updates the form in place
+  const liveStatus = isEditing
+    ? (appointments.find((a) => a.id === editAppt.id)?.status || editAppt.status)
+    : 'upcoming';
+  const isPast = liveStatus !== 'upcoming';
 
   // Form states
   const [tab, setTab] = useState('business');
-  
-  // Business fields
   const [clientName, setClientName] = useState('');
-  const [service, setService] = useState('braiding');
+  const [title, setTitle] = useState('');
+  const [items, setItems] = useState([]);
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [durationMins, setDurationMins] = useState(60);
-  const [price, setPrice] = useState('');
   const [notes, setNotes] = useState('');
-
-  // Personal fields
-  const [title, setTitle] = useState('');
 
   // UI state
   const [isSuccess, setIsSuccess] = useState(false);
-  const [showConflictModal, setShowConflictModal] = useState(false);
-  const [pendingSaveData, setPendingSaveData] = useState(null);
+  const [showPriceList, setShowPriceList] = useState(false);
 
-  // Load edit data
+  // Load edit data (or a prefilled slot tapped on the calendar)
   useEffect(() => {
     if (isEditing) {
       setTab(editAppt.type);
       setDate(editAppt.date);
       setTime(editAppt.time);
       setNotes(editAppt.notes || '');
+      setDurationMins(getDurationMins(editAppt));
 
       if (editAppt.type === 'business') {
         setClientName(editAppt.clientName || '');
-        setService(editAppt.service || 'braiding');
-        setDurationMins(editAppt.durationMins || 60);
-        setPrice(editAppt.price || '');
+        setItems(toFormItems(editAppt));
       } else {
         setTitle(editAppt.title || '');
       }
     } else {
-      // Default to today in Oshawa / Eastern Time
-      setDate(getOshawaTodayStr());
+      setDate(prefill?.date || getOshawaTodayStr());
+      if (prefill?.time) setTime(prefill.time);
     }
-  }, [editAppt, isEditing]);
+  }, [editAppt, isEditing, prefill]);
+
+  // Custom service names she has used before, per service type (newest first),
+  // so hair lines only suggest past hair services and so on
+  const recentByKind = useMemo(() => {
+    const out = {};
+    const seen = new Set();
+    [...appointments]
+      .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+      .forEach((a) => {
+        (a.items || []).forEach((i) => {
+          if (!i.name || i.catalog || findOption(i.kind, i.name)) return;
+          const key = `${i.kind}:${i.name.toLowerCase()}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          (out[i.kind] = out[i.kind] || []).push({ name: i.name, price: i.price });
+        });
+      });
+    Object.keys(out).forEach((k) => { out[k] = out[k].slice(0, 8); });
+    return out;
+  }, [appointments]);
+
+  const total = Math.round(items.reduce((sum, i) => sum + (parsePrice(i.price) ?? 0), 0) * 100) / 100;
+  const hasAnyPrice = items.some((i) => parsePrice(i.price) !== null);
+  const totalLabel = hasAnyPrice ? formatMoney(total) : '—';
+
+  // ---- Service line operations ----
+  const patchItem = (id, patch) =>
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+
+  const removeItem = (id) => setItems((prev) => prev.filter((i) => i.id !== id));
+
+  const addBlank = (kind) =>
+    setItems((prev) => (prev.length < MAX_ITEMS ? [...prev, blankItem(kind)] : prev));
+
+  // Pick an option from a line's dropdown (null = custom service)
+  const pickOption = (id, option) => {
+    if (!option) {
+      patchItem(id, { catalog: undefined, qty: undefined });
+      return;
+    }
+    const line = optionLine(option, 1);
+    patchItem(id, { catalog: option.name, qty: 1, name: line.name, price: String(line.price) });
+  };
+
+  const setLineQty = (item, qty) => {
+    const option = findOption(item.kind, item.catalog);
+    if (!option) return;
+    const q = Math.max(1, Math.min(20, qty));
+    const line = optionLine(option, q);
+    patchItem(item.id, { qty: q, name: line.name, price: String(line.price) });
+  };
+
+  // How many of a price-list option are on the booking right now
+  const countFor = (option) =>
+    items
+      .filter((i) => i.catalog === option.name)
+      .reduce((n, i) => n + (option.perNail ? i.qty || 1 : 1), 0);
+
+  const addFromPriceList = (option, kind) => {
+    setItems((prev) => {
+      const existing = prev.find((i) => i.catalog === option.name);
+      if (option.perNail && existing) {
+        const qty = Math.min(20, (existing.qty || 1) + 1);
+        const line = optionLine(option, qty);
+        return prev.map((i) => (i.id === existing.id ? { ...i, qty, name: line.name, price: String(line.price) } : i));
+      }
+      const line = optionLine(option, 1);
+      const item = { id: newItemId(), kind, name: line.name, price: String(line.price), catalog: option.name, qty: 1 };
+      return prev.length < MAX_ITEMS ? [...prev, item] : prev;
+    });
+  };
+
+  const removeFromPriceList = (option) => {
+    setItems((prev) => {
+      const matches = prev.filter((i) => i.catalog === option.name);
+      if (matches.length === 0) return prev;
+      const last = matches[matches.length - 1];
+      if (option.perNail && (last.qty || 1) > 1) {
+        const qty = last.qty - 1;
+        const line = optionLine(option, qty);
+        return prev.map((i) => (i.id === last.id ? { ...i, qty, name: line.name, price: String(line.price) } : i));
+      }
+      return prev.filter((i) => i.id !== last.id);
+    });
+  };
+
+  // ---- Scheduling / overlap ----
+  const candidate = { id: editAppt?.id, date, time, durationMins };
+  const conflict = !isPast && date && time ? findConflict(candidate, appointments) : null;
+  // Bookings saved before overlap checks existed can still be edited in place
+  const slotUnchanged =
+    isEditing &&
+    editAppt.date === date &&
+    editAppt.time === time &&
+    getDurationMins(editAppt) === durationMins;
+  const isBlocked = !!conflict && !slotUnchanged;
+  const nextFree = isBlocked ? findNextFreeStart(candidate, appointments) : null;
 
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Validations
     if (tab === 'business' && !clientName.trim()) return;
     if (tab === 'personal' && !title.trim()) return;
-    if (!date || !time) return;
+    if (!date || !time || isBlocked) return;
 
-    // Package data
     const apptData = {
       type: tab,
       date,
       time,
+      durationMins: Number(durationMins),
       notes: notes.trim() || null
     };
 
     if (tab === 'business') {
       apptData.clientName = clientName.trim();
-      apptData.service = service;
-      apptData.durationMins = Number(durationMins);
-      apptData.price = price !== '' ? Number(price) : null;
+      apptData.items = items.map((i) => ({
+        id: i.id,
+        kind: i.kind,
+        name: i.name,
+        price: parsePrice(i.price),
+        catalog: i.catalog,
+        qty: i.qty
+      }));
     } else {
       apptData.title = title.trim();
     }
 
     if (isEditing) {
-      apptData.id = editAppt.id;
-    }
-
-    // Check conflict
-    const conflictExists = checkConflict(apptData);
-    if (conflictExists) {
-      setPendingSaveData(apptData);
-      setShowConflictModal(true);
-    } else {
-      executeSave(apptData);
-    }
-  };
-
-  const executeSave = (apptData) => {
-    if (isEditing) {
-      updateAppointment(editAppt.id, apptData);
+      updateAppointment(editAppt.id, { ...apptData, id: editAppt.id });
     } else {
       addAppointment(apptData);
     }
 
-    setShowConflictModal(false);
     setIsSuccess(true);
-    
     setTimeout(() => {
       setIsSuccess(false);
       onSave();
     }, 2000);
   };
 
-  // Actions for edit mode
   const handleComplete = () => {
     completeAppointment(editAppt.id);
     onSave();
@@ -142,21 +268,115 @@ export default function AddView({ editAppt, onSave, onCancel }) {
           {isEditing ? 'Updated!' : 'Booked! 🌸'}
         </h2>
         <p className="font-sans text-gray-500 font-extrabold text-sm text-center">
-          Saved and reminders are set 💅
+          {isPast ? 'Changes saved to History' : `${formatTimeRange(time, durationMins)} · reminders are set 💅`}
         </p>
       </div>
     );
   }
 
+  // Date, time, duration and the overlap check, shared by both booking types
+  const scheduleFields = (
+    <div className="flex flex-col gap-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="appt-date" className={labelClass}>Date</label>
+          <input id="appt-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} required className={fieldClass} />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="appt-time" className={labelClass}>Start time</label>
+          <input id="appt-time" type="time" value={time} onChange={(e) => setTime(e.target.value)} required className={fieldClass} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="appt-duration" className={labelClass}>Duration</label>
+          <select
+            id="appt-duration"
+            value={durationMins}
+            onChange={(e) => setDurationMins(Number(e.target.value))}
+            className={fieldClass}
+          >
+            {DURATION_OPTIONS.map((m) => (
+              <option key={m} value={m}>{formatDurationLabel(m)}</option>
+            ))}
+            {!DURATION_OPTIONS.includes(durationMins) && (
+              <option value={durationMins}>{formatDurationLabel(durationMins)}</option>
+            )}
+          </select>
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <span className={labelClass}>Time slot</span>
+          <div
+            data-testid="time-slot"
+            className={`rounded-xl p-3 text-sm font-black tabular-nums border ${
+              isBlocked
+                ? 'bg-red-50 border-red-200 text-red-600'
+                : 'bg-pink-soft/50 border-pink-100 text-pink-deep'
+            }`}
+          >
+            {time ? formatTimeRange(time, durationMins) : 'Pick a start time'}
+          </div>
+        </div>
+      </div>
+
+      {conflict && (
+        <div
+          role="alert"
+          data-testid="overlap-alert"
+          className={`rounded-xl p-3 border flex flex-col gap-2 ${
+            isBlocked ? 'bg-red-50 border-red-200' : 'bg-amber-50 border-amber-200'
+          }`}
+        >
+          <p className={`font-sans text-xs font-bold leading-snug ${isBlocked ? 'text-red-700' : 'text-amber-800'}`}>
+            {isBlocked ? 'This time is taken. ' : 'Heads up: '}
+            {whoOf(conflict)} is booked {formatTimeRange(conflict.time, getDurationMins(conflict))}
+            {conflict.date !== date ? ' (previous day)' : ''}.
+          </p>
+          {isBlocked && (
+            nextFree ? (
+              <button
+                type="button"
+                data-testid="use-next-free"
+                onClick={() => setTime(nextFree)}
+                className="self-start px-3 py-2 rounded-lg bg-white border border-red-200 text-red-700 font-extrabold text-xs cursor-pointer hover:border-red-400 focus-visible:outline-2 focus-visible:outline-pink-primary"
+              >
+                Next free time: {formatTime(nextFree)}
+              </button>
+            ) : (
+              <p className="font-sans text-xs font-semibold text-red-700/80">
+                The rest of this day is full for a {formatDurationLabel(durationMins)} booking. Try an earlier time or another day.
+              </p>
+            )
+          )}
+        </div>
+      )}
+    </div>
+  );
+
+  const notesField = (placeholder) => (
+    <div className="flex flex-col gap-1.5">
+      <label htmlFor="appt-notes" className={labelClass}>Notes (optional)</label>
+      <textarea
+        id="appt-notes"
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder={placeholder}
+        rows={3}
+        className={`${fieldClass} resize-none`}
+      />
+    </div>
+  );
+
   return (
     <div className="flex flex-col min-h-full">
-      
+
       {/* Header */}
       <div className="bg-gradient-to-br from-pink-primary via-[#EC4899] to-pink-deep pt-7 pb-6 px-6 text-white shadow-[0_8px_25px_rgba(219,39,119,0.18)] rounded-b-[28px] mb-2 flex-shrink-0 flex items-center justify-between">
         <h1 className="font-serif italic text-[24px] font-black tracking-wide drop-shadow-sm text-white">
           {isEditing ? 'Edit Appointment' : 'New Appointment 🌸'}
         </h1>
-        <button 
+        <button
           onClick={onCancel}
           className="bg-white/20 border-none rounded-xl px-3 py-1.5 text-xs font-black text-white hover:bg-white/30 cursor-pointer"
         >
@@ -165,220 +385,175 @@ export default function AddView({ editAppt, onSave, onCancel }) {
       </div>
 
       <form onSubmit={handleSubmit} className="px-5 pt-5 flex flex-col gap-5 flex-1 pb-10">
-        
-        {/* Type Toggle Tab (Hidden in Edit mode to keep type immutable) */}
-        {!isEditing && (
-          <div className="bg-pink-soft/40 p-1 rounded-2xl flex border border-pink-100/50">
+
+        {/* Status banner for bookings already in History */}
+        {isEditing && isPast && statusCopy[liveStatus] && (
+          <div
+            data-testid="status-banner"
+            className={`rounded-2xl p-3.5 border flex flex-col gap-3 ${
+              liveStatus === 'completed'
+                ? 'bg-green-50/70 border-green-200/70'
+                : 'bg-red-50/60 border-red-200/60'
+            }`}
+          >
+            <div className="flex items-start gap-3">
+              <span
+                aria-hidden="true"
+                className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm font-black bg-white ${
+                  liveStatus === 'completed' ? 'text-green-600' : 'text-red-500'
+                }`}
+              >
+                {liveStatus === 'completed' ? '✓' : '✗'}
+              </span>
+              <div className="min-w-0">
+                <div className={`font-sans text-[13px] font-black ${liveStatus === 'completed' ? 'text-green-800' : 'text-red-700'}`}>
+                  {statusCopy[liveStatus].title}
+                </div>
+                <p className={`font-sans text-xs font-semibold leading-snug mt-0.5 ${liveStatus === 'completed' ? 'text-green-900/75' : 'text-red-900/70'}`}>
+                  {statusCopy[liveStatus].body}
+                </p>
+              </div>
+            </div>
             <button
               type="button"
-              onClick={() => setTab('business')}
-              className={`flex-1 py-3 rounded-xl border-none font-sans text-xs font-black transition-all cursor-pointer ${
-                tab === 'business'
-                  ? 'bg-white text-pink-deep shadow-[0_2px_8px_rgba(219,39,119,0.06)]'
-                  : 'text-gray-500 hover:text-pink-deep/85 font-extrabold'
-              }`}
+              data-testid="reopen-appt"
+              onClick={() => reopenAppointment(editAppt.id)}
+              className="w-full py-2.5 rounded-xl bg-white text-gray-700 font-extrabold text-xs border border-gray-200 hover:border-pink-primary hover:text-pink-deep transition-all cursor-pointer flex items-center justify-center gap-1.5 focus-visible:outline-2 focus-visible:outline-pink-primary"
             >
-              💅 Business Booking
-            </button>
-            <button
-              type="button"
-              onClick={() => setTab('personal')}
-              className={`flex-1 py-3 rounded-xl border-none font-sans text-xs font-black transition-all cursor-pointer ${
-                tab === 'personal'
-                  ? 'bg-white text-pink-deep shadow-[0_2px_8px_rgba(219,39,119,0.06)]'
-                  : 'text-gray-500 hover:text-pink-deep/85 font-extrabold'
-              }`}
-            >
-              🌸 Personal Schedule
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M9 14L4 9l5-5" />
+                <path d="M4 9h11a5 5 0 010 10h-3" />
+              </svg>
+              {statusCopy[liveStatus].action}
             </button>
           </div>
         )}
 
-        {/* Business Form Fields */}
+        {/* Type Toggle Tab (Hidden in Edit mode to keep type immutable) */}
+        {!isEditing && (
+          <div className="bg-pink-soft/40 p-1 rounded-2xl flex border border-pink-100/50">
+            {[
+              { value: 'business', label: '💅 Business Booking' },
+              { value: 'personal', label: '🌸 Personal Schedule' }
+            ].map((t) => (
+              <button
+                key={t.value}
+                type="button"
+                onClick={() => setTab(t.value)}
+                className={`flex-1 py-3 rounded-xl border-none font-sans text-xs font-black transition-all cursor-pointer ${
+                  tab === t.value
+                    ? 'bg-white text-pink-deep shadow-[0_2px_8px_rgba(219,39,119,0.06)]'
+                    : 'text-gray-500 hover:text-pink-deep/85 font-extrabold'
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {tab === 'business' ? (
           <div className="flex flex-col gap-4">
-            
+
             {/* Client Name */}
             <div className="flex flex-col gap-1.5">
-              <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
-                Client Name
-              </label>
+              <label htmlFor="appt-client" className={labelClass}>Client Name</label>
               <input
+                id="appt-client"
                 type="text"
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
                 placeholder="e.g. Sola"
                 required
-                className="w-full bg-white border border-pink-100 rounded-xl p-3 text-sm font-semibold outline-none focus:border-pink-primary transition-all text-gray-700 shadow-sm shadow-pink-100/10"
+                className={`${fieldClass} shadow-pink-100/10`}
               />
             </div>
 
-            {/* Service Selection */}
-            <div className="flex flex-col gap-1.5">
-              <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
-                Service
-              </label>
-              <div className="flex gap-2">
-                {[
-                  { value: 'braiding', label: '🌀 Braiding' },
-                  { value: 'nails', label: '💅 Nails' },
-                  { value: 'both', label: '✨ Both' }
-                ].map((s) => (
-                  <button
-                    key={s.value}
-                    type="button"
-                    onClick={() => setService(s.value)}
-                    className={`flex-1 py-2.5 rounded-xl text-xs font-black border-2 cursor-pointer transition-all ${
-                      service === s.value
-                        ? 'border-pink-primary bg-pink-soft/30 text-pink-deep'
-                        : 'border-pink-50/50 bg-white text-gray-500 hover:border-pink-100 font-bold'
-                    }`}
-                  >
-                    {s.label}
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Services (itemized scope of work) */}
+            <fieldset className="flex flex-col gap-2 border-none p-0 m-0 min-w-0" data-testid="services-editor">
+              <legend className={`${labelClass} mb-1.5 p-0`}>Services</legend>
 
-            {/* Date & Time Row */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
-                  Date
-                </label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  required
-                  className="w-full bg-white border border-pink-100 rounded-xl p-3 text-sm font-semibold outline-none focus:border-pink-primary transition-all text-gray-700 shadow-sm"
-                />
-              </div>
-              
-              <div className="flex flex-col gap-1.5">
-                <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
-                  Time
-                </label>
-                <input
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  required
-                  className="w-full bg-white border border-pink-100 rounded-xl p-3 text-sm font-semibold outline-none focus:border-pink-primary transition-all text-gray-700 shadow-sm"
-                />
-              </div>
-            </div>
-
-            {/* Price & Duration Row */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
-                  Price ($)
-                </label>
-                <input
-                  type="number"
-                  value={price}
-                  onChange={(e) => setPrice(e.target.value)}
-                  placeholder="e.g. 80"
-                  className="w-full bg-white border border-pink-100 rounded-xl p-3 text-sm font-semibold outline-none focus:border-pink-primary transition-all text-gray-700 shadow-sm"
-                />
-              </div>
-
-              <div className="flex flex-col gap-1.5">
-                <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
-                  Duration
-                </label>
-                <select
-                  value={durationMins}
-                  onChange={(e) => setDurationMins(Number(e.target.value))}
-                  className="w-full bg-white border border-pink-100 rounded-xl p-3 text-sm font-semibold outline-none focus:border-pink-primary transition-all text-gray-700 shadow-sm"
+              {items.length === 0 && (
+                <div
+                  data-testid="services-empty"
+                  className="rounded-xl border-2 border-dashed border-pink-200 bg-white/60 px-4 py-4 text-center font-sans text-xs font-bold text-gray-500 leading-relaxed"
                 >
-                  {durationOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </option>
+                  No services yet. Pick from the price list, or add a hair, nails or other service below.
+                </div>
+              )}
+
+              <ul className="flex flex-col gap-2 list-none p-0 m-0">
+                {items.map((item, index) => (
+                  <ServiceLine
+                    key={item.id}
+                    item={item}
+                    index={index}
+                    recent={recentByKind[item.kind] || []}
+                    onPick={(option) => pickOption(item.id, option)}
+                    onChange={(patch) => patchItem(item.id, patch)}
+                    onQty={(q) => setLineQty(item, q)}
+                    onRemove={() => removeItem(item.id)}
+                  />
+                ))}
+              </ul>
+
+              <button
+                type="button"
+                data-testid="open-price-list"
+                onClick={() => setShowPriceList(true)}
+                className="w-full py-3 rounded-xl bg-pink-soft/70 hover:bg-pink-soft text-pink-deep font-black text-[13px] border border-pink-200/70 cursor-pointer transition-all flex items-center justify-center gap-2 focus-visible:outline-2 focus-visible:outline-pink-primary"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M8 6h12M8 12h12M8 18h12" />
+                  <circle cx="4" cy="6" r="1" fill="currentColor" />
+                  <circle cx="4" cy="12" r="1" fill="currentColor" />
+                  <circle cx="4" cy="18" r="1" fill="currentColor" />
+                </svg>
+                Price list
+              </button>
+
+              {items.length < MAX_ITEMS && (
+                <div className="flex gap-2">
+                  {Object.entries(SERVICE_KINDS).map(([key, k]) => (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => addBlank(key)}
+                      className="flex-1 py-2.5 rounded-xl text-xs font-black border-2 border-dashed border-pink-200 bg-white/60 text-pink-deep hover:bg-pink-soft/40 hover:border-pink-primary cursor-pointer transition-all focus-visible:outline-2 focus-visible:outline-pink-primary"
+                    >
+                      + {k.label}
+                    </button>
                   ))}
-                </select>
+                </div>
+              )}
+
+              <div className="flex items-baseline justify-between pr-1 pt-1">
+                <span className={labelClass}>Total</span>
+                <span data-testid="services-total" className="font-sans text-lg font-black text-pink-deep tabular-nums">
+                  {totalLabel}
+                </span>
               </div>
-            </div>
+            </fieldset>
 
-            {/* Notes */}
-            <div className="flex flex-col gap-1.5">
-              <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
-                Notes (optional)
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="e.g. Knotless braids, medium length, light pink extensions"
-                rows={3}
-                className="w-full bg-white border border-pink-100 rounded-xl p-3 text-sm font-semibold outline-none focus:border-pink-primary transition-all text-gray-700 shadow-sm resize-none"
-              />
-            </div>
-
+            {scheduleFields}
+            {notesField('e.g. Knotless braids, medium length, light pink extensions')}
           </div>
         ) : (
-          /* Personal Form Fields */
           <div className="flex flex-col gap-4">
-            
-            {/* Title / Objective */}
             <div className="flex flex-col gap-1.5">
-              <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
-                What's it for?
-              </label>
+              <label htmlFor="appt-title" className={labelClass}>What's it for?</label>
               <input
+                id="appt-title"
                 type="text"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Doctor's appointment"
                 required
-                className="w-full bg-white border border-pink-100 rounded-xl p-3 text-sm font-semibold outline-none focus:border-pink-primary transition-all text-gray-700 shadow-sm shadow-pink-100/10"
+                className={`${fieldClass} shadow-pink-100/10`}
               />
             </div>
-
-            {/* Date & Time Row */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="flex flex-col gap-1.5">
-                <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
-                  Date
-                </label>
-                <input
-                  type="date"
-                  value={date}
-                  onChange={(e) => setDate(e.target.value)}
-                  required
-                  className="w-full bg-white border border-pink-100 rounded-xl p-3 text-sm font-semibold outline-none focus:border-pink-primary transition-all text-gray-700 shadow-sm"
-                />
-              </div>
-              
-              <div className="flex flex-col gap-1.5">
-                <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
-                  Time
-                </label>
-                <input
-                  type="time"
-                  value={time}
-                  onChange={(e) => setTime(e.target.value)}
-                  required
-                  className="w-full bg-white border border-pink-100 rounded-xl p-3 text-sm font-semibold outline-none focus:border-pink-primary transition-all text-gray-700 shadow-sm"
-                />
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div className="flex flex-col gap-1.5">
-              <label className="font-sans text-[11px] font-extrabold text-gray-500 uppercase tracking-wider">
-                Notes (optional)
-              </label>
-              <textarea
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder="Any extra details..."
-                rows={3}
-                className="w-full bg-white border border-pink-100 rounded-xl p-3 text-sm font-semibold outline-none focus:border-pink-primary transition-all text-gray-700 shadow-sm resize-none"
-              />
-            </div>
-
+            {scheduleFields}
+            {notesField('Any extra details...')}
           </div>
         )}
 
@@ -386,12 +561,13 @@ export default function AddView({ editAppt, onSave, onCancel }) {
         <div className="flex flex-col gap-2 mt-auto pt-4">
           <button
             type="submit"
-            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-primary to-pink-deep text-white font-extrabold text-sm shadow-lg shadow-pink-primary/20 hover:opacity-95 transition-all border-none cursor-pointer"
+            disabled={isBlocked}
+            className="w-full py-3.5 rounded-2xl bg-gradient-to-r from-pink-primary to-pink-deep text-white font-extrabold text-sm shadow-lg shadow-pink-primary/20 hover:opacity-95 transition-all border-none cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed disabled:shadow-none"
           >
-            {isEditing ? 'Save Changes ✨' : 'Save Booking ✨'}
+            {isBlocked ? 'Pick a free time to save' : isEditing ? 'Save Changes ✨' : 'Save Booking ✨'}
           </button>
 
-          {isEditing && (
+          {isEditing && !isPast && (
             <div className="grid grid-cols-2 gap-2 mt-1">
               <button
                 type="button"
@@ -400,7 +576,6 @@ export default function AddView({ editAppt, onSave, onCancel }) {
               >
                 Mark as Completed ✅
               </button>
-              
               <button
                 type="button"
                 onClick={handleCancel}
@@ -411,19 +586,16 @@ export default function AddView({ editAppt, onSave, onCancel }) {
             </div>
           )}
         </div>
-
       </form>
 
-      {/* Conflict Dialog */}
-      <ConflictModal
-        isOpen={showConflictModal}
-        onConfirm={() => executeSave(pendingSaveData)}
-        onCancel={() => {
-          setShowConflictModal(false);
-          setPendingSaveData(null);
-        }}
+      <PriceListSheet
+        isOpen={showPriceList}
+        countFor={countFor}
+        onAdd={addFromPriceList}
+        onRemove={removeFromPriceList}
+        totalLabel={totalLabel}
+        onClose={() => setShowPriceList(false)}
       />
-
     </div>
   );
 }

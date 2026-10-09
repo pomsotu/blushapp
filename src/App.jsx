@@ -50,8 +50,17 @@ const SettingsIco = ({ active }) => (
 export default function App() {
   const [currentView, setCurrentView] = useState('home');
   const [editingAppt, setEditingAppt] = useState(null);
+  const [returnView, setReturnView] = useState('home');
+  const [prefill, setPrefill] = useState(null);
+  const [calendarDate, setCalendarDate] = useState(() => new Date());
   const activeToast = useAppStore((state) => state.activeToast);
   const dismissToast = useAppStore((state) => state.dismissToast);
+  const lastStatusChange = useAppStore((state) => state.lastStatusChange);
+  const undoLastStatusChange = useAppStore((state) => state.undoLastStatusChange);
+  const dismissStatusChange = useAppStore((state) => state.dismissStatusChange);
+  const undoAppt = useAppStore((state) =>
+    state.lastStatusChange ? state.appointments.find((a) => a.id === state.lastStatusChange.id) : null
+  );
 
   // Initial setup & notification checker
   useEffect(() => {
@@ -78,11 +87,22 @@ export default function App() {
   }, []);
 
   const handleEditAppt = (appt) => {
+    setReturnView(currentView === 'add' ? 'home' : currentView);
     setEditingAppt(appt);
     setCurrentView('add');
   };
 
+  // New booking at a time tapped on the calendar timeline
+  const handleAddAt = (date, time) => {
+    setReturnView('cal');
+    setEditingAppt(null);
+    setPrefill({ date, time });
+    setCurrentView('add');
+  };
+
   const handleAddNewAppt = () => {
+    setPrefill(null);
+    setReturnView(currentView === 'add' ? 'home' : currentView);
     setEditingAppt(null);
     setCurrentView('add');
   };
@@ -93,23 +113,26 @@ export default function App() {
       case 'home':
         return <HomeView onEditAppt={handleEditAppt} />;
       case 'cal':
-        return <CalendarView onEditAppt={handleEditAppt} />;
+        return <CalendarView onEditAppt={handleEditAppt} onAddAt={handleAddAt} selectedDate={calendarDate} onSelectDate={setCalendarDate} />;
       case 'add':
         return (
           <AddView 
             editAppt={editingAppt} 
+            prefill={prefill}
             onSave={() => {
               setEditingAppt(null);
-              setCurrentView('home');
+              setPrefill(null);
+              setCurrentView(editingAppt || prefill ? returnView : 'home');
             }} 
             onCancel={() => {
               setEditingAppt(null);
-              setCurrentView('home');
+              setPrefill(null);
+              setCurrentView(returnView);
             }} 
           />
         );
       case 'hist':
-        return <HistoryView />;
+        return <HistoryView onEditAppt={handleEditAppt} />;
       case 'settings':
         return <SettingsView />;
       default:
@@ -155,6 +178,35 @@ export default function App() {
         <div className="flex-1 overflow-y-auto no-scrollbar bg-gradient-to-b from-[#FFFDFE] to-pink-50/20">
           {renderView()}
         </div>
+
+        {/* Undo bar after completing or cancelling a booking */}
+        {lastStatusChange && undoAppt && (
+          <div className="absolute left-4 right-4 bottom-[84px] z-40 blush-undo-bar" role="status" aria-live="polite">
+            <div className="bg-gray-900/95 text-white rounded-2xl pl-4 pr-1.5 py-1.5 shadow-[0_10px_30px_rgba(31,31,31,0.28)] flex items-center gap-2">
+              <span className="font-sans text-[12.5px] font-bold flex-1 min-w-0 truncate">
+                {undoAppt.type === 'business' ? undoAppt.clientName : undoAppt.title} marked {lastStatusChange.status}
+              </span>
+              <button
+                type="button"
+                data-testid="undo-status"
+                onClick={undoLastStatusChange}
+                className="font-sans text-[12.5px] font-black text-pink-300 hover:text-pink-200 bg-transparent border-none px-3 py-2.5 rounded-xl cursor-pointer focus-visible:outline-2 focus-visible:outline-pink-300"
+              >
+                Undo
+              </button>
+              <button
+                type="button"
+                onClick={dismissStatusChange}
+                aria-label="Dismiss"
+                className="w-9 h-9 flex items-center justify-center text-white/60 hover:text-white bg-transparent border-none rounded-xl cursor-pointer"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" />
+                </svg>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Docked Floating-Style Bottom Navigation */}
         <div className="bg-white/95 backdrop-blur-lg border-t border-pink-100/70 px-3 pt-2 pb-safe flex items-center justify-between relative z-30 flex-shrink-0 shadow-[0_-4px_20px_rgba(244,114,182,0.06)]">

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
+import { scopeSummary, formatMoney } from '../utils/services';
 
 const formatTime = (timeStr) => {
   const [h, m] = timeStr.split(':').map(Number);
@@ -8,13 +9,7 @@ const formatTime = (timeStr) => {
   return `${hour}:${String(m).padStart(2, '0')} ${ampm}`;
 };
 
-const serviceLabels = {
-  braiding: 'Hair Braiding',
-  nails: 'Nail Art',
-  both: 'Hair & Nails'
-};
-
-export default function HistoryView() {
+export default function HistoryView({ onEditAppt }) {
   const appointments = useAppStore((state) => state.appointments);
   const [filter, setFilter] = useState('all');
 
@@ -62,7 +57,7 @@ export default function HistoryView() {
               TOTAL EARNED
             </span>
             <div className="mt-2">
-              <div className="font-sans text-[22px] font-black leading-none">${totalEarned}</div>
+              <div className="font-sans text-[22px] font-black leading-none">{formatMoney(totalEarned)}</div>
               <div className="font-sans text-[11px] font-bold text-white/95 mt-1">all time</div>
             </div>
           </div>
@@ -113,9 +108,13 @@ export default function HistoryView() {
               });
 
               return (
-                <div
+                <button
+                  type="button"
                   key={appt.id}
-                  className={`bg-white rounded-2xl p-4 flex items-center gap-3.5 shadow-[0_2px_10px_rgba(244,114,182,0.02)] border border-pink-100/30 border-l-[3.5px] ${borderLeftColor}`}
+                  data-testid="history-item"
+                  onClick={() => onEditAppt && onEditAppt(appt)}
+                  aria-label={`Open ${isP ? appt.title : appt.clientName}, ${appt.status}`}
+                  className={`w-full text-left bg-white rounded-2xl p-4 flex items-center gap-3.5 shadow-[0_2px_10px_rgba(244,114,182,0.02)] border border-pink-100/30 border-l-[3.5px] ${borderLeftColor} cursor-pointer transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(244,114,182,0.07)] focus-visible:outline-2 focus-visible:outline-pink-primary`}
                 >
                   {/* Status Indicator */}
                   <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-sm ${
@@ -131,9 +130,9 @@ export default function HistoryView() {
                     <div className="font-sans font-bold text-gray-800 text-[13px] leading-tight truncate">
                       {isP ? appt.title : appt.clientName}
                     </div>
-                    <div className="font-sans text-[10px] text-gray-500 mt-1 font-bold">
+                    <div className="font-sans text-[10px] text-gray-500 mt-1 font-bold truncate">
                       {dateLabel} · {formatTime(appt.time)}
-                      {!isP && ` · ${serviceLabels[appt.service] || appt.service}`}
+                      {!isP && ` · ${scopeSummary(appt) || 'No services added'}`}
                     </div>
                   </div>
 
@@ -143,7 +142,7 @@ export default function HistoryView() {
                       <div className={`font-sans font-extrabold text-[13px] ${
                         appt.status === 'completed' ? 'text-pink-deep' : 'text-gray-500'
                       }`}>
-                        ${appt.price}
+                        {formatMoney(appt.price)}
                       </div>
                     )}
                     <div className={`text-[9px] font-black uppercase tracking-wider mt-0.5 ${
@@ -153,7 +152,7 @@ export default function HistoryView() {
                     </div>
                   </div>
 
-                </div>
+                </button>
               );
             })}
           </div>

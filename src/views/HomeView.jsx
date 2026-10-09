@@ -3,6 +3,8 @@ import { useAppStore } from '../store/useAppStore';
 import ApptCard from '../components/ApptCard';
 import { getOshawaTodayStr, parseAppointmentTime, TIMEZONE } from '../utils/dateUtils';
 import { registerPushSubscription } from '../utils/pushManager';
+import { scopeSummary, formatMoney } from '../utils/services';
+import { getDurationMins } from '../utils/schedule';
 
 export default function HomeView({ onEditAppt }) {
   const appointments = useAppStore((state) => state.appointments);
@@ -67,7 +69,7 @@ export default function HomeView({ onEditAppt }) {
   // 1. Calculate 30-minute Pre-Appointment Alert item
   const startingSoonAppt = upcoming.find((appt) => {
     const startTime = parseAppointmentTime(appt.date, appt.time);
-    const durationMins = appt.type === 'business' ? (appt.durationMins || 60) : 60;
+    const durationMins = getDurationMins(appt);
     const endTime = startTime + durationMins * 60 * 1000;
     
     // Starts within 30 minutes, or currently ongoing
@@ -78,7 +80,7 @@ export default function HomeView({ onEditAppt }) {
   const pendingFollowups = appointments.filter((appt) => {
     if (appt.status !== 'upcoming') return false;
     const startTime = parseAppointmentTime(appt.date, appt.time);
-    const durationMins = appt.type === 'business' ? (appt.durationMins || 60) : 60;
+    const durationMins = getDurationMins(appt);
     const endTime = startTime + durationMins * 60 * 1000;
     
     return now >= (endTime + 2 * 60 * 60 * 1000);
@@ -125,7 +127,7 @@ export default function HomeView({ onEditAppt }) {
               EST. EARNINGS
             </span>
             <div className="mt-2.5">
-              <div className="font-sans text-[26px] font-black leading-none">${earningsToday}</div>
+              <div className="font-sans text-[26px] font-black leading-none">{formatMoney(earningsToday)}</div>
               <div className="font-sans text-[11px] font-bold text-white/90 mt-1">today</div>
             </div>
           </div>
@@ -191,17 +193,17 @@ export default function HomeView({ onEditAppt }) {
             <div className="flex flex-col gap-2.5">
               {pendingFollowups.map((appt) => (
                 <div key={appt.id} className="bg-white rounded-xl p-3 border border-amber-200/60 shadow-sm flex flex-col gap-2.5">
-                  <div className="flex items-center justify-between">
-                    <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="min-w-0">
                       <div className="font-sans font-black text-[13px] text-gray-800">
                         {appt.type === 'business' ? appt.clientName : appt.title}
                       </div>
-                      <div className="font-sans text-[10px] text-gray-500 font-bold mt-0.5">
-                        {appt.date} · {appt.time} {appt.type === 'business' ? `(${appt.service})` : '(Personal)'}
+                      <div className="font-sans text-[10px] text-gray-500 font-bold mt-0.5 truncate">
+                        {appt.date} · {appt.time} {appt.type === 'business' ? `· ${scopeSummary(appt) || 'No services added'}` : '(Personal)'}
                       </div>
                     </div>
                     {appt.price != null && appt.type === 'business' && (
-                      <div className="font-sans font-black text-pink-deep text-[13px]">${appt.price}</div>
+                      <div className="font-sans font-black text-pink-deep text-[13px]">{formatMoney(appt.price)}</div>
                     )}
                   </div>
                   
@@ -211,6 +213,12 @@ export default function HomeView({ onEditAppt }) {
                       className="flex-1 py-1.5 rounded-lg bg-green-500 hover:bg-green-600 text-white font-extrabold text-[11px] shadow-sm transition-all cursor-pointer flex items-center justify-center gap-1"
                     >
                       ✓ Completed
+                    </button>
+                    <button
+                      onClick={() => onEditAppt(appt)}
+                      className="flex-1 py-1.5 rounded-lg bg-pink-soft/70 hover:bg-pink-soft text-pink-deep font-extrabold text-[11px] transition-all cursor-pointer flex items-center justify-center gap-1"
+                    >
+                      Edit services
                     </button>
                     <button
                       onClick={() => cancelAppointment(appt.id)}

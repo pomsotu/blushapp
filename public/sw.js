@@ -154,7 +154,7 @@ self.addEventListener('message', (event) => {
     const [year, month, day] = appt.date.split('-').map(Number);
     const [hour, minute] = appt.time.split(':').map(Number);
     const startTime = new Date(year, month - 1, day, hour, minute).getTime();
-    const durationMins = appt.type === 'business' ? (appt.durationMins || 60) : 60;
+    const durationMins = appt.durationMins > 0 ? appt.durationMins : 60;
     const endTime = startTime + durationMins * 60 * 1000;
     const now = Date.now();
 

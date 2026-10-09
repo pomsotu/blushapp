@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { parseAppointmentTime, getOshawaTodayStr } from '../utils/dateUtils';
 import { syncRemindersWithServer, sendServerTestPush } from '../utils/pushManager';
+import { sanitizeItems, itemsTotal, deriveService } from '../utils/services';
+import { absStart, getDurationMins, rangesOverlap, findConflict } from '../utils/schedule';
 
 // Soft, pleasant blossom chime for in-app and active tab alerts
 export const playAlertChime = () => {
@@ -135,17 +137,9 @@ export const triggerDirectNotification = async (title, options = {}) => {
 
 // Check if two time slots overlap
 export const checkOverlap = (date1, time1, duration1, date2, time2, duration2) => {
-  if (date1 !== date2) return false;
-
-  const [h1, m1] = time1.split(':').map(Number);
-  const start1 = h1 * 60 + m1;
-  const end1 = start1 + (duration1 || 60);
-
-  const [h2, m2] = time2.split(':').map(Number);
-  const start2 = h2 * 60 + m2;
-  const end2 = start2 + (duration2 || 60);
-
-  return start1 < end2 && start2 < end1;
+  const start1 = absStart(date1, time1);
+  const start2 = absStart(date2, time2);
+  return rangesOverlap(start1, start1 + (duration1 || 60), start2, start2 + (duration2 || 60));
 };
 
 // Redundant Data Safety Vault Helper (Guarantees data preservation across updates)
@@ -172,6 +166,21 @@ export const getSafetyVault = () => {
   }
 };
 
+// Keep a business booking's legacy service/price fields in sync with its items
+const withNormalizedItems = (fields) => {
+  if (!Array.isArray(fields.items)) return fields;
+  const items = sanitizeItems(fields.items);
+  return {
+    ...fields,
+    items,
+    price: itemsTotal(items),
+    service: deriveService(items)
+  };
+};
+
+// How long the "Undo" bar stays up after completing or cancelling
+export const UNDO_WINDOW_MS = 6000;
+
 // Empty database by default for production use
 const INITIAL_APPOINTMENTS = [];
 
@@ -181,6 +190,7 @@ export const useAppStore = create(
       appointments: INITIAL_APPOINTMENTS,
       notifiedHistory: {},
       activeToast: null,
+      lastStatusChange: null,
       settings: {
         remind30m: true,       // 30 mins before appointment
         remind2hAfter: true,   // 2 hours after appointment (follow-up to mark completed/cancelled)
@@ -200,25 +210,7 @@ export const useAppStore = create(
       dismissToast: () => set({ activeToast: null }),
 
       // Conflict Check helper
-      checkConflict: (newAppt) => {
-        const appts = get().appointments.filter(
-          (a) => a.status === 'upcoming' && a.id !== newAppt.id && a.date === newAppt.date
-        );
-
-        const newDuration = newAppt.type === 'business' 
-          ? (newAppt.durationMins || 60) 
-          : 60; // Personal is always 60m
-
-        return appts.some((existing) => {
-          const extDuration = existing.type === 'business'
-            ? (existing.durationMins || 60)
-            : 60;
-          return checkOverlap(
-            newAppt.date, newAppt.time, newDuration,
-            existing.date, existing.time, extDuration
-          );
-        });
-      },
+      checkConflict: (newAppt) => !!findConflict(newAppt, get().appointments),
 
       // Check and fire pending live alerts (called periodically and on app focus)
       checkPendingNotifications: () => {
@@ -232,7 +224,7 @@ export const useAppStore = create(
           if (appt.status !== 'upcoming') return;
 
           const startTime = parseAppointmentTime(appt.date, appt.time);
-          const durationMins = appt.type === 'business' ? (appt.durationMins || 60) : 60;
+          const durationMins = getDurationMins(appt);
           const endTime = startTime + durationMins * 60 * 1000;
 
           // 1. Check 30-minute Pre-Appointment Reminder
@@ -287,7 +279,7 @@ export const useAppStore = create(
       addAppointment: (appt) => {
         const id = crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9);
         const newAppt = {
-          ...appt,
+          ...withNormalizedItems(appt),
           id,
           status: 'upcoming',
           createdAt: new Date().toISOString()
@@ -305,7 +297,8 @@ export const useAppStore = create(
         get().checkPendingNotifications();
       },
 
-      updateAppointment: (id, updatedFields) => {
+      updateAppointment: (id, rawFields) => {
+        const updatedFields = withNormalizedItems(rawFields);
         set((state) => {
           const updatedAppts = state.appointments.map((a) => 
             a.id === id ? { ...a, ...updatedFields } : a
@@ -325,41 +318,60 @@ export const useAppStore = create(
         get().checkPendingNotifications();
       },
 
-      completeAppointment: (id) => {
+      // Shared status transition: completed / cancelled / back to upcoming
+      setAppointmentStatus: (id, status, { trackUndo = true } = {}) => {
+        const previous = get().appointments.find((a) => a.id === id);
+        if (!previous || previous.status === status) return;
+
         set((state) => {
-          const updatedAppts = state.appointments.map((a) => 
-            a.id === id ? { ...a, status: 'completed' } : a
+          const updatedAppts = state.appointments.map((a) =>
+            a.id === id ? { ...a, status } : a
           );
-          
+
           saveSafetyVault(updatedAppts);
 
-          const completedAppt = updatedAppts.find((a) => a.id === id);
-          if (completedAppt) {
-            notifyServiceWorker({ ...completedAppt, status: 'completed' }, state.settings);
+          const changedAppt = updatedAppts.find((a) => a.id === id);
+          if (changedAppt) {
+            notifyServiceWorker(changedAppt, state.settings);
           }
           syncRemindersWithServer(updatedAppts, state.settings);
 
-          return { appointments: updatedAppts };
+          const change = trackUndo
+            ? { id, previousStatus: previous.status, status, at: Date.now() }
+            : null;
+
+          return { appointments: updatedAppts, lastStatusChange: change };
         });
+
+        const change = get().lastStatusChange;
+        if (change) {
+          setTimeout(() => {
+            if (get().lastStatusChange === change) {
+              set({ lastStatusChange: null });
+            }
+          }, UNDO_WINDOW_MS);
+        }
       },
 
-      cancelAppointment: (id) => {
-        set((state) => {
-          const updatedAppts = state.appointments.map((a) => 
-            a.id === id ? { ...a, status: 'cancelled' } : a
-          );
-          
-          saveSafetyVault(updatedAppts);
+      completeAppointment: (id) => get().setAppointmentStatus(id, 'completed'),
 
-          const cancelledAppt = updatedAppts.find((a) => a.id === id);
-          if (cancelledAppt) {
-            notifyServiceWorker({ ...cancelledAppt, status: 'cancelled' }, state.settings);
-          }
-          syncRemindersWithServer(updatedAppts, state.settings);
+      cancelAppointment: (id) => get().setAppointmentStatus(id, 'cancelled'),
 
-          return { appointments: updatedAppts };
-        });
+      // Move a completed or cancelled booking back to upcoming
+      reopenAppointment: (id) => {
+        get().setAppointmentStatus(id, 'upcoming', { trackUndo: false });
+        get().checkPendingNotifications();
       },
+
+      // Revert the most recent complete/cancel (from the Undo bar)
+      undoLastStatusChange: () => {
+        const change = get().lastStatusChange;
+        if (!change) return;
+        get().setAppointmentStatus(change.id, change.previousStatus, { trackUndo: false });
+        get().checkPendingNotifications();
+      },
+
+      dismissStatusChange: () => set({ lastStatusChange: null }),
 
       updateSettings: (newSettings) => {
         set((state) => {
@@ -446,10 +458,16 @@ export const useAppStore = create(
                 ? Math.round(item.durationMins) 
                 : 60;
               clean.price = typeof item.price === 'number' && Number.isFinite(item.price) && item.price >= 0 && item.price <= 100000 
-                ? Number(item.price.toFixed(2)) 
+                ? Number(item.price.toFixed(2))
                 : null;
+              if (Array.isArray(item.items) && item.items.length > 0) {
+                Object.assign(clean, withNormalizedItems({ items: item.items }));
+              }
             } else {
               clean.title = typeof item.title === 'string' && item.title.trim() ? item.title.trim().slice(0, 150) : 'Personal Schedule';
+              clean.durationMins = typeof item.durationMins === 'number' && Number.isFinite(item.durationMins) && item.durationMins > 0 && item.durationMins <= 1440
+                ? Math.round(item.durationMins)
+                : 60;
             }
 
             return clean;
@@ -512,6 +530,7 @@ export const useAppStore = create(
             service: appt.service || (appt.type === 'business' ? 'braiding' : undefined),
             durationMins: typeof appt.durationMins === 'number' ? appt.durationMins : 60,
             price: typeof appt.price === 'number' ? appt.price : (appt.price ? Number(appt.price) : null),
+            ...(Array.isArray(appt.items) && appt.items.length > 0 ? withNormalizedItems({ items: appt.items }) : {}),
             date: appt.date || getOshawaTodayStr(),
             time: appt.time || '12:00',
             notes: appt.notes || null,
