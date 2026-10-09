@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import { scopeSummary, formatMoney } from '../utils/services';
 import ReportSheet from '../components/ReportSheet';
+import { reportFingerprint, monthKey } from '../utils/reportData';
+import { getOshawaTodayStr } from '../utils/dateUtils';
 
 const formatTime = (timeStr) => {
   const [h, m] = timeStr.split(':').map(Number);
@@ -14,6 +16,18 @@ export default function HistoryView({ onEditAppt }) {
   const appointments = useAppStore((state) => state.appointments);
   const [filter, setFilter] = useState('all');
   const [showReports, setShowReports] = useState(false);
+  const reportLog = useAppStore((state) => state.reportLog);
+
+  // Any report she already made that no longer matches the bookings
+  const reportsOutdated = useMemo(
+    () => {
+      const currentMonth = monthKey(getOshawaTodayStr());
+      return Object.entries(reportLog || {}).some(
+        ([period, entry]) => entry.fingerprint !== reportFingerprint(appointments, period, currentMonth)
+      );
+    },
+    [reportLog, appointments]
+  );
 
   // Filter history (completed or cancelled)
   const pastAppts = appointments
@@ -46,13 +60,17 @@ export default function HistoryView({ onEditAppt }) {
             type="button"
             data-testid="open-reports"
             onClick={() => setShowReports(true)}
-            className="flex items-center gap-1.5 bg-white text-pink-deep rounded-xl px-3.5 py-2 text-xs font-black border-none cursor-pointer shadow-[0_4px_14px_rgba(131,24,67,0.18)] hover:bg-pink-50 active:scale-95 transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+            aria-label={reportsOutdated ? 'Reports, updates available' : 'Reports'}
+            className="relative flex items-center gap-1.5 bg-white text-pink-deep rounded-xl px-3.5 py-2 text-xs font-black border-none cursor-pointer shadow-[0_4px_14px_rgba(131,24,67,0.18)] hover:bg-pink-50 active:scale-95 transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
           >
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M14 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V8z" />
               <path d="M14 3v5h5M9 17v-3M12 17v-6M15 17v-2" />
             </svg>
             Reports
+            {reportsOutdated && (
+              <span data-testid="reports-outdated-dot" className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-400 border-2 border-white" aria-hidden="true" />
+            )}
           </button>
         </div>
 

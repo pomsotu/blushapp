@@ -103,3 +103,35 @@ describe('report data', () => {
     expect(monthLabel('2026-02')).toBe('February 2026');
   });
 });
+
+describe('report fingerprint (detects changes since last report)', () => {
+  it('is stable for the same data and changes when a booking changes', async () => {
+    const { reportFingerprint } = await import('./reportData');
+    const base = reportFingerprint(data, '2026-10');
+    expect(reportFingerprint([...data].reverse(), '2026-10')).toBe(base);
+
+    const edited = data.map((a) => (a.id === 'b' ? { ...a, price: 999 } : a));
+    expect(reportFingerprint(edited, '2026-10')).not.toBe(base);
+
+    const completed = data.map((a) => (a.id === 'e' ? { ...a, status: 'completed' } : a));
+    expect(reportFingerprint(completed, '2026-10')).not.toBe(base);
+
+    const deleted = data.filter((a) => a.id !== 'c');
+    expect(reportFingerprint(deleted, '2026-10')).not.toBe(base);
+  });
+
+  it('ignores unrelated months and personal events, but counts the previous month', async () => {
+    const { reportFingerprint } = await import('./reportData');
+    const base = reportFingerprint(data, '2026-10');
+    const otherMonth = [...data, { id: 'z', type: 'business', clientName: 'Z', date: '2026-05-01', time: '10:00', status: 'completed', items: [], price: 50 }];
+    expect(reportFingerprint(otherMonth, '2026-10')).toBe(base);
+    const personal = data.map((a) => (a.id === 'p' ? { ...a, title: 'Spa' } : a));
+    expect(reportFingerprint(personal, '2026-10')).toBe(base);
+    const prevMonthEdit = data.map((a) => (a.id === 'a' ? { ...a, price: 1 } : a));
+    expect(reportFingerprint(prevMonthEdit, '2026-10')).not.toBe(base);
+    expect(reportFingerprint(otherMonth, 'all')).not.toBe(reportFingerprint(data, 'all'));
+    // a new month outdates the all-time report even with no booking changes
+    expect(reportFingerprint(data, 'all', '2026-11')).not.toBe(reportFingerprint(data, 'all', '2026-10'));
+    expect(reportFingerprint(data, '2026-10', '2026-11')).toBe(base);
+  });
+});

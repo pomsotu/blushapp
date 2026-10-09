@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAppStore } from '../store/useAppStore';
-import { getOshawaTodayStr } from '../utils/dateUtils';
-import { buildReport, availableMonths, monthLabel, monthKey } from '../utils/reportData';
+import { getOshawaTodayStr, TIMEZONE } from '../utils/dateUtils';
+import { buildReport, availableMonths, monthLabel, monthKey, reportFingerprint } from '../utils/reportData';
 import { createReportPdf, reportFileName } from '../utils/reportPdf';
 import { formatMoney } from '../utils/services';
 
@@ -14,10 +14,16 @@ const canShareFiles = () => {
   }
 };
 
+const madeLabel = (iso) =>
+  new Date(iso).toLocaleString('en-US', { timeZone: TIMEZONE, month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+
 // Bottom sheet for picking a report period, previewing the headline numbers
-// and downloading or sharing the PDF.
+// and downloading or sharing the PDF. Remembers when each period's report was
+// made and offers "Update report" when bookings have changed since.
 export default function ReportSheet({ isOpen, onClose }) {
   const appointments = useAppStore((state) => state.appointments);
+  const reportLog = useAppStore((state) => state.reportLog) || {};
+  const recordReport = useAppStore((state) => state.recordReport);
   const today = getOshawaTodayStr();
   const months = useMemo(() => availableMonths(appointments, monthKey(today)), [appointments, today]);
 
@@ -47,7 +53,18 @@ export default function ReportSheet({ isOpen, onClose }) {
     [isOpen, appointments, period, today]
   );
 
+  const fingerprint = useMemo(
+    () => (isOpen ? reportFingerprint(appointments, period, monthKey(today)) : ''),
+    [isOpen, appointments, period, today]
+  );
+
   if (!isOpen || !report) return null;
+
+  // Has this period's report been made before, and is it still current?
+  const last = reportLog[period];
+  const reportState = !last ? 'new' : last.fingerprint === fingerprint ? 'current' : 'stale';
+  const nextVersion = !last ? 1 : reportState === 'stale' ? last.version + 1 : last.version;
+  const primaryLabel = { new: 'Download PDF', current: 'Download again', stale: 'Update report' }[reportState];
 
   const s = report.summary;
   const hasData = report.ledger.length > 0;
@@ -56,15 +73,17 @@ export default function ReportSheet({ isOpen, onClose }) {
     setBusy(kind);
     setMessage(null);
     try {
-      const doc = await createReportPdf(report);
-      const fileName = reportFileName(report);
+      const doc = await createReportPdf(report, { version: nextVersion, madeAt: new Date() });
+      const fileName = reportFileName(report, nextVersion);
       if (kind === 'share') {
         const file = new File([doc.output('blob')], fileName, { type: 'application/pdf' });
         await navigator.share({ files: [file], title: `${report.title} - ${report.periodLabel}` });
-        setMessage({ tone: 'ok', text: 'Report shared.' });
+        recordReport(period, fingerprint);
+        setMessage({ tone: 'ok', text: reportState === 'stale' ? `Updated report shared (version ${nextVersion}).` : 'Report shared.' });
       } else {
         doc.save(fileName);
-        setMessage({ tone: 'ok', text: `Saved ${fileName}` });
+        recordReport(period, fingerprint);
+        setMessage({ tone: 'ok', text: reportState === 'stale' ? `Updated to version ${nextVersion}. Saved ${fileName}` : `Saved ${fileName}` });
       }
     } catch (err) {
       if (err?.name === 'AbortError') {
@@ -206,6 +225,23 @@ export default function ReportSheet({ isOpen, onClose }) {
             </p>
           )}
 
+          {reportState === 'current' && (
+            <div data-testid="report-status" className="flex items-start gap-2 rounded-xl bg-green-50 border border-green-200 px-3 py-2.5">
+              <svg className="mt-0.5 flex-shrink-0 text-green-700" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M5 12l5 5L20 7" /></svg>
+              <p className="font-sans text-xs font-bold text-green-800 m-0 leading-snug">
+                Up to date. Version {last.version} was made {madeLabel(last.generatedAt)} and nothing has changed since.
+              </p>
+            </div>
+          )}
+          {reportState === 'stale' && (
+            <div data-testid="report-status" className="flex items-start gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2.5">
+              <svg className="mt-0.5 flex-shrink-0 text-amber-700" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 12a9 9 0 11-3-6.7L21 8M21 3v5h-5" /></svg>
+              <p className="font-sans text-xs font-bold text-amber-900 m-0 leading-snug">
+                Bookings changed since your last report (version {last.version}, {madeLabel(last.generatedAt)}). Update it to get version {nextVersion} with the latest numbers.
+              </p>
+            </div>
+          )}
+
           {message && (
             <p
               role="status"
@@ -228,7 +264,7 @@ export default function ReportSheet({ isOpen, onClose }) {
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M12 3v12M7 10l5 5 5-5M5 21h14" />
             </svg>
-            {busy === 'download' ? 'Creating PDF…' : 'Download PDF'}
+            {busy === 'download' ? 'Creating PDF…' : primaryLabel}
           </button>
           {shareSupported && (
             <button
@@ -241,7 +277,7 @@ export default function ReportSheet({ isOpen, onClose }) {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4 12v7a2 2 0 002 2h12a2 2 0 002-2v-7M16 6l-4-4-4 4M12 2v13" />
               </svg>
-              {busy === 'share' ? 'Preparing…' : 'Share PDF'}
+              {busy === 'share' ? 'Preparing…' : reportState === 'stale' ? 'Share updated PDF' : 'Share PDF'}
             </button>
           )}
           {!shareSupported && <div className="h-2" aria-hidden="true" />}

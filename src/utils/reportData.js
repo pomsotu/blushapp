@@ -261,3 +261,25 @@ export const buildReport = (appointments, { period = 'all', today }) => {
     ledger
   };
 };
+
+// A short signature of everything a report for `period` is built from.
+// If any booking that feeds the report changes (added, edited, completed,
+// cancelled, deleted), the fingerprint changes and the report is out of date.
+// Monthly reports also compare with the previous month, so that month counts too.
+// All-time reports run up to the current month, so a new month outdates them.
+export const reportFingerprint = (appointments, period, currentMonth = '') => {
+  const months = period === 'all' ? null : new Set([period, previousMonthKey(period)]);
+  const rows = appointments
+    .filter((a) => a.type === 'business' && a.date && (!months || months.has(monthKey(a.date))))
+    .map((a) => [
+      a.id, a.status, a.date, a.time, getDurationMins(a), a.clientName || '',
+      typeof a.price === 'number' ? a.price : '',
+      getServiceItems(a).map((i) => `${i.kind}:${i.name}:${i.price ?? ''}`).join(',')
+    ].join('|'))
+    .sort();
+  // djb2 string hash, base-36
+  let h = 5381;
+  const str = rows.join('\n');
+  for (let i = 0; i < str.length; i += 1) h = ((h << 5) + h + str.charCodeAt(i)) | 0;
+  return `${rows.length}-${(h >>> 0).toString(36)}${period === 'all' ? `-${currentMonth}` : ''}`;
+};

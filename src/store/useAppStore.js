@@ -143,8 +143,11 @@ export const checkOverlap = (date1, time1, duration1, date2, time2, duration2) =
 };
 
 // Redundant Data Safety Vault Helper (Guarantees data preservation across updates)
-export const saveSafetyVault = (appointments) => {
-  if (typeof window === 'undefined' || !Array.isArray(appointments) || appointments.length === 0) return;
+// An empty list is only written when the user deliberately removed the last
+// booking (allowEmpty); otherwise an empty list never overwrites the backup.
+export const saveSafetyVault = (appointments, { allowEmpty = false } = {}) => {
+  if (typeof window === 'undefined' || !Array.isArray(appointments)) return;
+  if (appointments.length === 0 && !allowEmpty) return;
   try {
     const vault = {
       timestamp: Date.now(),
@@ -191,6 +194,8 @@ export const useAppStore = create(
       notifiedHistory: {},
       activeToast: null,
       lastStatusChange: null,
+      // When each report period was last downloaded: { [period]: { generatedAt, fingerprint, version } }
+      reportLog: {},
       settings: {
         remind30m: true,       // 30 mins before appointment
         remind2hAfter: true,   // 2 hours after appointment (follow-up to mark completed/cancelled)
@@ -373,6 +378,47 @@ export const useAppStore = create(
 
       dismissStatusChange: () => set({ lastStatusChange: null }),
 
+      // Permanently remove a booking from every record (history, earnings,
+      // calendar, reports, reminders). Not undoable; the UI confirms first.
+      deleteAppointment: (id) => {
+        const target = get().appointments.find((a) => a.id === id);
+        if (!target) return false;
+
+        set((state) => {
+          const updatedAppts = state.appointments.filter((a) => a.id !== id);
+          saveSafetyVault(updatedAppts, { allowEmpty: true });
+
+          // Clear any scheduled reminders for it
+          notifyServiceWorker({ ...target, status: 'cancelled' }, state.settings);
+          syncRemindersWithServer(updatedAppts, state.settings);
+
+          const notifiedHistory = Object.fromEntries(
+            Object.entries(state.notifiedHistory || {}).filter(([key]) => !key.includes(`_${id}_`))
+          );
+
+          return {
+            appointments: updatedAppts,
+            notifiedHistory,
+            lastStatusChange: state.lastStatusChange?.id === id ? null : state.lastStatusChange
+          };
+        });
+        return true;
+      },
+
+      // Remember that a report was downloaded, bumping its version when the
+      // underlying bookings changed since the last one
+      recordReport: (period, fingerprint) => {
+        const prev = get().reportLog?.[period];
+        const changed = !prev || prev.fingerprint !== fingerprint;
+        const entry = {
+          generatedAt: new Date().toISOString(),
+          fingerprint,
+          version: prev ? (changed ? prev.version + 1 : prev.version) : 1
+        };
+        set((state) => ({ reportLog: { ...(state.reportLog || {}), [period]: entry } }));
+        return entry;
+      },
+
       updateSettings: (newSettings) => {
         set((state) => {
           const mergedSettings = { ...state.settings, ...newSettings };
@@ -503,7 +549,8 @@ export const useAppStore = create(
       partialize: (state) => ({
         appointments: state.appointments,
         settings: state.settings,
-        notifiedHistory: state.notifiedHistory
+        notifiedHistory: state.notifiedHistory,
+        reportLog: state.reportLog
       }),
       migrate: (persistedState) => {
         if (!persistedState) return { appointments: [], settings: {}, notifiedHistory: {} };

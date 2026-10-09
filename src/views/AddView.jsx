@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useAppStore } from '../store/useAppStore';
 import PriceListSheet from '../components/PriceListSheet';
 import ServiceLine from '../components/ServiceLine';
+import ConfirmDialog from '../components/ConfirmDialog';
 import { findOption, optionLine } from '../data/priceList';
 import { getOshawaTodayStr, formatTime } from '../utils/dateUtils';
 import {
@@ -57,12 +58,17 @@ const fieldClass =
 
 const whoOf = (appt) => (appt.type === 'business' ? appt.clientName : appt.title);
 
+const prettyDate = (iso) =>
+  new Date(`${iso}T00:00:00`).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+
 export default function AddView({ editAppt, prefill, onSave, onCancel }) {
   const addAppointment = useAppStore((state) => state.addAppointment);
   const updateAppointment = useAppStore((state) => state.updateAppointment);
   const completeAppointment = useAppStore((state) => state.completeAppointment);
   const cancelAppointment = useAppStore((state) => state.cancelAppointment);
   const reopenAppointment = useAppStore((state) => state.reopenAppointment);
+  const deleteAppointment = useAppStore((state) => state.deleteAppointment);
+  const showToast = useAppStore((state) => state.showToast);
   const appointments = useAppStore((state) => state.appointments);
 
   const isEditing = !!editAppt;
@@ -85,6 +91,7 @@ export default function AddView({ editAppt, prefill, onSave, onCancel }) {
   // UI state
   const [isSuccess, setIsSuccess] = useState(false);
   const [showPriceList, setShowPriceList] = useState(false);
+  const [confirming, setConfirming] = useState(null); // 'cancel' | 'delete' | null
 
   // Load edit data (or a prefilled slot tapped on the calendar)
   useEffect(() => {
@@ -252,11 +259,34 @@ export default function AddView({ editAppt, prefill, onSave, onCancel }) {
   };
 
   const handleCancel = () => {
-    if (window.confirm('Cancel this appointment? This will move it to history.')) {
-      cancelAppointment(editAppt.id);
-      onSave();
-    }
+    setConfirming(null);
+    cancelAppointment(editAppt.id);
+    onSave();
   };
+
+  const handleDelete = () => {
+    const who = whoOf(editAppt) || 'Booking';
+    setConfirming(null);
+    if (deleteAppointment(editAppt.id)) {
+      showToast({
+        id: Date.now(),
+        title: 'Booking deleted',
+        body: `${who} on ${prettyDate(editAppt.date)} was removed from all records.`
+      });
+    }
+    onSave();
+  };
+
+  // Summary of the saved booking, shown in the confirmation pop-ups
+  const confirmDetails = isEditing ? (
+    <>
+      <div className="text-gray-900">{whoOf(editAppt)}</div>
+      <div className="font-semibold text-gray-600">
+        {prettyDate(editAppt.date)} · {formatTimeRange(editAppt.time, getDurationMins(editAppt))}
+        {editAppt.type === 'business' && typeof editAppt.price === 'number' ? ` · ${formatMoney(editAppt.price)}` : ''}
+      </div>
+    </>
+  ) : null;
 
   if (isSuccess) {
     return (
@@ -578,15 +608,52 @@ export default function AddView({ editAppt, prefill, onSave, onCancel }) {
               </button>
               <button
                 type="button"
-                onClick={handleCancel}
+                onClick={() => setConfirming('cancel')}
                 className="w-full py-3 rounded-2xl bg-red-50 text-red-500 font-extrabold text-xs transition-all border border-red-200/50 cursor-pointer"
               >
                 Cancel Appointment ❌
               </button>
             </div>
           )}
+
+          {isEditing && (
+            <button
+              type="button"
+              data-testid="delete-appt"
+              onClick={() => setConfirming('delete')}
+              className="mt-4 self-center flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-transparent border-none text-red-600 hover:bg-red-50 font-extrabold text-xs cursor-pointer transition-colors focus-visible:outline-2 focus-visible:outline-red-500"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 6h18M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6" />
+              </svg>
+              Delete permanently
+            </button>
+          )}
         </div>
       </form>
+
+      <ConfirmDialog
+        isOpen={confirming === 'delete'}
+        title="Delete this booking for good?"
+        message="It will be removed from your calendar, History, earnings and reports, and its reminders will stop. This can't be undone."
+        details={confirmDetails}
+        confirmLabel="Delete permanently"
+        cancelLabel="Keep booking"
+        onConfirm={handleDelete}
+        onCancel={() => setConfirming(null)}
+      />
+
+      <ConfirmDialog
+        isOpen={confirming === 'cancel'}
+        title="Cancel this appointment?"
+        message="It moves to History as cancelled and its reminders stop. You can restore it later from History."
+        details={confirmDetails}
+        tone="neutral"
+        confirmLabel="Cancel appointment"
+        cancelLabel="Keep appointment"
+        onConfirm={handleCancel}
+        onCancel={() => setConfirming(null)}
+      />
 
       <PriceListSheet
         isOpen={showPriceList}

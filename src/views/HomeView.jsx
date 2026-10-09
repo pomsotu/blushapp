@@ -248,7 +248,13 @@ export default function HomeView({ onEditAppt }) {
           ) : (
             <div className="flex flex-col gap-3">
               {todayAppts.map((appt) => (
-                <ApptCard key={appt.id} appt={appt} onClick={() => onEditAppt(appt)} />
+                <ApptCard
+                  key={appt.id}
+                  appt={appt}
+                  onClick={() => onEditAppt(appt)}
+                  onComplete={() => completeAppointment(appt.id)}
+                  onCancel={() => cancelAppointment(appt.id)}
+                />
               ))}
             </div>
           )}
@@ -262,7 +268,14 @@ export default function HomeView({ onEditAppt }) {
             </div>
             <div className="flex flex-col gap-3">
               {upcomingAppts.map((appt) => (
-                <ApptCard key={appt.id} appt={appt} showDate onClick={() => onEditAppt(appt)} />
+                <ApptCard
+                  key={appt.id}
+                  appt={appt}
+                  showDate
+                  onClick={() => onEditAppt(appt)}
+                  onComplete={() => completeAppointment(appt.id)}
+                  onCancel={() => cancelAppointment(appt.id)}
+                />
               ))}
             </div>
           </div>

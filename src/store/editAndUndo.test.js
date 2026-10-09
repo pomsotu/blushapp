@@ -156,3 +156,60 @@ describe('undoing a completed or cancelled booking', () => {
     expect(useAppStore.getState().lastStatusChange).toBeNull();
   });
 });
+
+describe('permanent delete and report log', () => {
+  beforeEach(() => {
+    // The safety vault lives in localStorage; give the node test env one
+    const mem = new Map();
+    vi.stubGlobal('window', {});
+    vi.stubGlobal('localStorage', {
+      getItem: (k) => (mem.has(k) ? mem.get(k) : null),
+      setItem: (k, v) => mem.set(k, String(v)),
+      removeItem: (k) => mem.delete(k)
+    });
+    useAppStore.setState({ appointments: [], lastStatusChange: null, notifiedHistory: {}, reportLog: {} });
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it('removes a booking from every record, including the safety vault', async () => {
+    const { getSafetyVault } = await import('./useAppStore');
+    useAppStore.getState().addAppointment(baseBooking);
+    useAppStore.getState().addAppointment({ ...baseBooking, clientName: 'Duplicate' });
+    const dup = useAppStore.getState().appointments[1];
+    useAppStore.setState({ notifiedHistory: { [`30m_${dup.id}_2026-07-14_12:00`]: 1, keep_other: 2 } });
+
+    expect(useAppStore.getState().deleteAppointment(dup.id)).toBe(true);
+    const state = useAppStore.getState();
+    expect(state.appointments).toHaveLength(1);
+    expect(state.appointments[0].clientName).toBe('Sola');
+    expect(Object.keys(state.notifiedHistory)).toEqual(['keep_other']);
+    expect(getSafetyVault().appointments.some((a) => a.id === dup.id)).toBe(false);
+  });
+
+  it('deleting the last booking empties the vault so it cannot come back', async () => {
+    const { getSafetyVault } = await import('./useAppStore');
+    useAppStore.getState().addAppointment(baseBooking);
+    const { id } = useAppStore.getState().appointments[0];
+    useAppStore.getState().deleteAppointment(id);
+    expect(useAppStore.getState().appointments).toHaveLength(0);
+    expect(getSafetyVault().appointments).toHaveLength(0);
+  });
+
+  it('works for completed bookings and clears a pending undo for it', () => {
+    useAppStore.getState().addAppointment(baseBooking);
+    const { id } = useAppStore.getState().appointments[0];
+    useAppStore.getState().completeAppointment(id);
+    useAppStore.getState().deleteAppointment(id);
+    expect(useAppStore.getState().lastStatusChange).toBeNull();
+    expect(useAppStore.getState().deleteAppointment('missing')).toBe(false);
+  });
+
+  it('recordReport versions only when the data changed', () => {
+    const r = useAppStore.getState().recordReport;
+    expect(r('2026-10', 'fp1').version).toBe(1);
+    expect(r('2026-10', 'fp1').version).toBe(1);
+    expect(r('2026-10', 'fp2').version).toBe(2);
+    expect(r('all', 'x').version).toBe(1);
+    expect(useAppStore.getState().reportLog['2026-10'].fingerprint).toBe('fp2');
+  });
+});

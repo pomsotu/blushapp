@@ -16,7 +16,11 @@ const formatDuration = (mins) => {
   return rMins ? `${hrs}h ${rMins}m` : `${hrs}h`;
 };
 
-export default function ApptCard({ appt, showDate = false, onClick }) {
+// Booking card. Tapping the card opens it for editing; optional quick
+// actions (Complete / Cancel) sit in their own row below.
+export default function ApptCard({ appt, showDate = false, onClick, onComplete, onCancel }) {
+  const who = appt.type === 'personal' ? appt.title : appt.clientName;
+  const hasActions = appt.status === 'upcoming' && (onComplete || onCancel);
   const isPersonal = appt.type === 'personal';
   const accentColor = isPersonal ? 'text-violet-600' : 'text-pink-deep';
   const bgClass = isPersonal ? 'bg-lavender-soft/80' : 'bg-pink-soft/60';
@@ -32,8 +36,16 @@ export default function ApptCard({ appt, showDate = false, onClick }) {
 
   return (
     <div
+      data-testid="appt-card"
+      className={`bg-white rounded-2xl shadow-[0_4px_16px_rgba(244,114,182,0.04)] border border-pink-100/60 border-l-[4px] ${borderLeftColor} transition-all duration-200 hover:shadow-[0_6px_20px_rgba(244,114,182,0.07)] overflow-hidden`}
+    >
+    <div
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      aria-label={onClick ? `Open ${who}, ${formatTime(appt.time)}` : undefined}
       onClick={onClick}
-      className={`bg-white rounded-2xl p-4 flex items-center gap-4 shadow-[0_4px_16px_rgba(244,114,182,0.04)] border border-pink-100/60 border-l-[4px] ${borderLeftColor} transition-all duration-200 hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(244,114,182,0.07)] ${onClick ? 'cursor-pointer' : ''}`}
+      onKeyDown={onClick ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick(); } } : undefined}
+      className={`p-4 flex items-center gap-4 ${onClick ? 'cursor-pointer hover:bg-pink-50/30 focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-pink-primary' : ''}`}
     >
       {/* Time Badge */}
       <div className={`${bgClass} rounded-xl px-2.5 py-1.5 min-w-[70px] text-center flex-shrink-0 border border-white/80`}>
@@ -85,6 +97,41 @@ export default function ApptCard({ appt, showDate = false, onClick }) {
           </div>
         )}
       </div>
+    </div>
+
+      {hasActions && (
+        <div className="flex border-t border-pink-100/70" data-testid="appt-quick-actions">
+          {onComplete && (
+            <button
+              type="button"
+              data-testid="quick-complete"
+              onClick={onComplete}
+              aria-label={`Mark ${who} completed`}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-transparent border-none text-green-700 hover:bg-green-50 active:bg-green-100 font-extrabold text-[12px] cursor-pointer transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-green-600"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M5 12l5 5L20 7" />
+              </svg>
+              Complete
+            </button>
+          )}
+          {onComplete && onCancel && <div className="w-px bg-pink-100/70" aria-hidden="true" />}
+          {onCancel && (
+            <button
+              type="button"
+              data-testid="quick-cancel"
+              onClick={onCancel}
+              aria-label={`Cancel ${who}`}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 bg-transparent border-none text-gray-500 hover:text-red-600 hover:bg-red-50 active:bg-red-100 font-extrabold text-[12px] cursor-pointer transition-colors focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-red-500"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.8" strokeLinecap="round" aria-hidden="true">
+                <path d="M6 6l12 12M18 6L6 18" />
+              </svg>
+              Cancel
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }
